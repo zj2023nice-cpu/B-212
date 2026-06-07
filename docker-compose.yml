@@ -1,0 +1,36 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: milktea-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: milktea
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  backend:
+    build: ./backend
+    container_name: milktea-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/milktea?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: milktea-frontend
+    restart: always
+    ports:
+      - "13000:80"
+    depends_on:
+      - backend
