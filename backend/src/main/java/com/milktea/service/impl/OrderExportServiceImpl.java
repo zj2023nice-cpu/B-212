@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.dto.OrderExportDTO;
 import com.milktea.dto.OrderExportVO;
 import com.milktea.entity.ExportAuditLog;
@@ -29,8 +30,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,13 +69,6 @@ public class OrderExportServiceImpl implements OrderExportService {
                 return;
             }
 
-            List<Long> allOrderIds = orderMapper.selectList(queryWrapper)
-                    .stream().map(Order::getId).collect(Collectors.toList());
-
-            Map<Long, User> userMap = getUserMap(allOrderIds);
-
-            Map<Long, List<OrderItem>> orderItemMap = getOrderItemMap(allOrderIds);
-
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setCharacterEncoding("utf-8");
             String fileName = URLEncoder.encode("订单数据_" + LocalDate.now().format(DATE_FMT), StandardCharsets.UTF_8)
@@ -83,24 +79,27 @@ public class OrderExportServiceImpl implements OrderExportService {
             WriteSheet writeSheet = EasyExcel.writerSheet("订单数据").build();
 
             try {
-                for (int offset = 0; offset < allOrderIds.size(); offset += BATCH_SIZE) {
-                    int end = Math.min(offset + BATCH_SIZE, allOrderIds.size());
-                    List<Long> batchIds = allOrderIds.subList(offset, end);
+                long totalPages = (totalRecords + BATCH_SIZE - 1) / BATCH_SIZE;
+                for (long currentPage = 1; currentPage <= totalPages; currentPage++) {
+                    Page<Order> page = new Page<>(currentPage, BATCH_SIZE, false);
+                    Page<Order> orderPage = orderMapper.selectPage(page, buildQueryWrapper(dto));
+                    List<Order> batchOrders = orderPage.getRecords();
+                    if (batchOrders.isEmpty()) {
+                        continue;
+                    }
 
-                    LambdaQueryWrapper<Order> batchQuery = new LambdaQueryWrapper<Order>()
-                            .in(Order::getId, batchIds)
-                            .orderByDesc(Order::getCreateTime);
-                    List<Order> batchOrders = orderMapper.selectList(batchQuery);
+                    Map<Long, User> userMap = getUserMap(batchOrders);
+                    Map<Long, List<OrderItem>> orderItemMap = getOrderItemMap(batchOrders);
 
-                    List<OrderExportVO> voList = new ArrayList<>();
+                    List<OrderExportVO> voList = new ArrayList<>(batchOrders.size());
                     for (Order order : batchOrders) {
-                        OrderExportVO vo = convertToVO(order, userMap, orderItemMap);
-                        voList.add(vo);
+                        voList.add(convertToVO(order, userMap, orderItemMap));
                     }
 
                     excelWriter.write(voList, writeSheet);
                     totalCount += voList.size();
-                    logger.info("订单导出分批写入进度: {}/{}", Math.min(offset + BATCH_SIZE, allOrderIds.size()), allOrderIds.size());
+                    logger.info("订单导出分批写入进度: 第{}/{}页, 当前批次: {}条, 累计: {}/{}",
+                            currentPage, totalPages, voList.size(), totalCount, totalRecords);
                 }
             } finally {
                 excelWriter.finish();
@@ -132,19 +131,19 @@ public class OrderExportServiceImpl implements OrderExportService {
             wrapper.eq(Order::getStatus, dto.getStatus());
         }
 
-        wrapper.orderByDesc(Order::getCreateTime);
+        wrapper.orderByDesc(Order::getCreateTime)
+                .orderByDesc(Order::getId);
         return wrapper;
     }
 
-    private Map<Long, User> getUserMap(List<Long> orderIds) {
-        if (orderIds.isEmpty()) {
+    private Map<Long, User> getUserMap(List<Order> orders) {
+        if (orders.isEmpty()) {
             return Map.of();
         }
-        LambdaQueryWrapper<Order> idWrapper = new LambdaQueryWrapper<Order>()
-                .in(Order::getId, orderIds)
-                .select(Order::getId, Order::getUserId);
-        List<Order> orders = orderMapper.selectList(idWrapper);
-        List<Long> userIds = orders.stream().map(Order::getUserId).distinct().collect(Collectors.toList());
+        Set<Long> userIds = orders.stream()
+                .map(Order::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         if (userIds.isEmpty()) {
             return Map.of();
@@ -153,7 +152,14 @@ public class OrderExportServiceImpl implements OrderExportService {
         return users.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
     }
 
-    private Map<Long, List<OrderItem>> getOrderItemMap(List<Long> orderIds) {
+    private Map<Long, List<OrderItem>> getOrderItemMap(List<Order> orders) {
+        if (orders.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
         if (orderIds.isEmpty()) {
             return Map.of();
         }
