@@ -79,6 +79,10 @@ function handleBusinessError(code, message) {
 
 service.interceptors.response.use(
   response => {
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
+
     const res = response.data
     
     if (res.code === undefined || res.code === null) {

@@ -62,3 +62,6 @@ export const checkFavorite = (productId) => request.get('/favorites/check', { pa
 export const batchCheckFavorite = (productIds) => request.post('/favorites/batch-check', productIds)
 
 export const getDashboardData = () => request.get('/admin/dashboard')
+
+export const adminListOrders = (params) => request.get('/orders/admin/list', { params })
+export const exportOrders = (params) => request.get('/admin/orders/export', { params, responseType: 'blob', timeout: 60000 })

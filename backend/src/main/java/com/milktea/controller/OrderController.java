@@ -14,6 +14,7 @@ import com.milktea.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
@@ -239,6 +240,29 @@ public class OrderController {
         }
         
         return Result.success(order);
+    }
+
+    @GetMapping("/admin/list")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Page<Order>> adminListOrders(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        Page<Order> pageParam = new Page<>(page, pageSize);
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(Order::getStatus, status);
+        }
+        if (startDate != null && !startDate.isEmpty()) {
+            wrapper.ge(Order::getCreateTime, java.time.LocalDate.parse(startDate).atStartOfDay());
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            wrapper.le(Order::getCreateTime, java.time.LocalDate.parse(endDate).atTime(java.time.LocalTime.MAX));
+        }
+        wrapper.orderByDesc(Order::getCreateTime);
+        return Result.success(orderMapper.selectPage(pageParam, wrapper));
     }
 
     @GetMapping("/{id}/items")

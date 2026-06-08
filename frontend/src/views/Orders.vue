@@ -1,6 +1,33 @@
 <template>
   <div class="max-w-4xl mx-auto">
-    <h2 class="text-2xl font-bold mb-6 text-gray-800">我的订单</h2>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">{{ isAdmin ? '订单管理' : '我的订单' }}</h2>
+      <el-button v-if="isAdmin" type="success" @click="exportVisible = true">
+        <el-icon class="mr-1"><Download /></el-icon>导出订单
+      </el-button>
+    </div>
+
+    <div v-if="isAdmin" class="mb-4 flex flex-wrap gap-3 items-center">
+      <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 140px" @change="handleFilterChange">
+        <el-option label="待支付" :value="0" />
+        <el-option label="制作中" :value="1" />
+        <el-option label="配送中" :value="2" />
+        <el-option label="已取消" :value="3" />
+        <el-option label="已送达" :value="4" />
+        <el-option label="已评价" :value="5" />
+      </el-select>
+      <el-date-picker
+        v-model="filterDateRange"
+        type="daterange"
+        range-separator="至"
+        start-placeholder="开始日期"
+        end-placeholder="结束日期"
+        value-format="YYYY-MM-DD"
+        style="width: 260px"
+        @change="handleFilterChange"
+      />
+      <el-button type="primary" plain @click="resetFilters">重置筛选</el-button>
+    </div>
 
     <div v-if="orders.length > 0" class="space-y-4">
       <div
@@ -67,7 +94,6 @@
       <el-empty description="暂无订单" />
     </div>
 
-    <!-- Pagination -->
     <div v-if="orders.length > 0" class="mt-8 flex justify-center">
       <el-pagination
         v-model:current-page="currentPage"
@@ -80,7 +106,6 @@
       />
     </div>
 
-    <!-- Cancel Order Dialog -->
     <el-dialog v-model="cancelVisible" title="取消订单" width="400px">
       <div class="text-center py-4">
         <el-icon class="text-4xl text-warning mb-4"><Warning /></el-icon>
@@ -94,14 +119,46 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="exportVisible" title="导出订单数据" width="480px" :close-on-click-modal="false">
+      <el-form label-width="100px">
+        <el-form-item label="日期范围">
+          <el-date-picker
+            v-model="exportDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="订单状态">
+          <el-select v-model="exportStatus" placeholder="全部状态" clearable style="width: 100%">
+            <el-option label="待支付" :value="0" />
+            <el-option label="制作中" :value="1" />
+            <el-option label="配送中" :value="2" />
+            <el-option label="已取消" :value="3" />
+            <el-option label="已送达" :value="4" />
+            <el-option label="已评价" :value="5" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button @click="exportVisible = false">取消</el-button>
+          <el-button type="primary" :loading="exportLoading" @click="handleExport">确认导出</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { getMyOrders, updateOrderStatus } from '@/api'
+import { ref, computed, onMounted } from 'vue'
+import { getMyOrders, updateOrderStatus, adminListOrders, exportOrders } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning } from '@element-plus/icons-vue'
+import { Warning, Download } from '@element-plus/icons-vue'
 
 const orders = ref([])
 const cancelVisible = ref(false)
@@ -110,6 +167,17 @@ const currentOrder = ref(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
+const user = computed(() => JSON.parse(localStorage.getItem('user') || 'null'))
+const isAdmin = computed(() => user.value?.role === 'ADMIN')
+
+const filterStatus = ref(null)
+const filterDateRange = ref(null)
+
+const exportVisible = ref(false)
+const exportDateRange = ref(null)
+const exportStatus = ref(null)
+const exportLoading = ref(false)
 
 const getStatusText = status => {
   const map = {
@@ -170,10 +238,79 @@ const handlePageSizeChange = async () => {
   await fetchOrders()
 }
 
+const handleFilterChange = () => {
+  currentPage.value = 1
+  fetchOrders()
+}
+
+const resetFilters = () => {
+  filterStatus.value = null
+  filterDateRange.value = null
+  currentPage.value = 1
+  fetchOrders()
+}
+
 const fetchOrders = async () => {
-  const data = await getMyOrders(currentPage.value, pageSize.value)
-  orders.value = data.records
-  total.value = data.total
+  if (isAdmin.value) {
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value
+    }
+    if (filterStatus.value !== null && filterStatus.value !== undefined) {
+      params.status = filterStatus.value
+    }
+    if (filterDateRange.value && filterDateRange.value.length === 2) {
+      params.startDate = filterDateRange.value[0]
+      params.endDate = filterDateRange.value[1]
+    }
+    const data = await adminListOrders(params)
+    orders.value = data.records
+    total.value = data.total
+  } else {
+    const data = await getMyOrders(currentPage.value, pageSize.value)
+    orders.value = data.records
+    total.value = data.total
+  }
+}
+
+const handleExport = async () => {
+  exportLoading.value = true
+  try {
+    const params = {}
+    if (exportDateRange.value && exportDateRange.value.length === 2) {
+      params.startDate = exportDateRange.value[0]
+      params.endDate = exportDateRange.value[1]
+    }
+    if (exportStatus.value !== null && exportStatus.value !== undefined) {
+      params.status = exportStatus.value
+    }
+
+    const blob = await exportOrders(params)
+
+    if (blob.type && blob.type.includes('application/json')) {
+      const text = await blob.text()
+      const errorData = JSON.parse(text)
+      ElMessage.error(errorData.message || '导出失败')
+      return
+    }
+
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const today = new Date().toISOString().slice(0, 10)
+    link.setAttribute('download', `订单数据_${today}.xlsx`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('订单导出成功')
+    exportVisible.value = false
+  } catch (error) {
+    ElMessage.error('导出失败：' + (error.message || '未知错误'))
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 onMounted(fetchOrders)

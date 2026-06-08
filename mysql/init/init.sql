@@ -219,3 +219,18 @@ CREATE TABLE `favorites` (
     FOREIGN KEY (product_id) REFERENCES products(id),
     UNIQUE KEY `uk_user_product` (`user_id`, `product_id`)
 ) ENGINE=InnoDB COMMENT='商品收藏表';
+
+-- 16. 导出审计日志表
+CREATE TABLE `export_audit_logs` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `operator_id` BIGINT NOT NULL COMMENT '操作用户ID',
+    `operator_name` VARCHAR(50) NOT NULL COMMENT '操作用户名',
+    `export_type` VARCHAR(50) NOT NULL COMMENT '导出类型',
+    `filter_start_date` VARCHAR(20) COMMENT '筛选开始日期',
+    `filter_end_date` VARCHAR(20) COMMENT '筛选结束日期',
+    `filter_status` VARCHAR(50) COMMENT '筛选状态',
+    `export_count` INT DEFAULT 0 COMMENT '导出记录数',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    INDEX `idx_operator_id` (`operator_id`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB COMMENT='导出审计日志表';
