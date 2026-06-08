@@ -310,7 +310,7 @@ const handleCheckout = async () => {
     availableCoupons.value = []
   }
   try {
-    const promoData = await calculatePromotion()
+    const promoData = await calculatePromotion({ orderAmount: parseFloat(totalPrice.value) })
     if (promoData.applied) {
       promotionDiscountAmount.value = parseFloat(promoData.discountAmount) || 0
       promotionName.value = promoData.promotionName || ''

@@ -11,6 +11,9 @@ import com.milktea.service.UserService;
 import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
 import com.milktea.service.AddressService;
+import com.milktea.service.NotificationService;
+import com.milktea.service.PromotionService;
+import com.milktea.util.PromotionCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,12 @@ class OrderControllerTest {
 
     @Mock
     private OrderCancelLogMapper orderCancelLogMapper;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private PromotionService promotionService;
 
     @InjectMocks
     private OrderController orderController;
@@ -152,11 +161,18 @@ class OrderControllerTest {
     void testCreateOrder_Success() {
         setupUserAuthentication();
         List<CartItem> cartItems = Collections.singletonList(testCartItem);
-        
+        Promotion promotion = new Promotion();
+        promotion.setId(11L);
+        promotion.setName("满30减5");
+        PromotionCalculator.PromotionResult promotionResult = PromotionCalculator.PromotionResult.of(promotion, new BigDecimal("5.00"));
+
         when(cartItemMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(cartItems);
         when(productMapper.selectById(1L)).thenReturn(testProduct);
+        when(productService.calculateUnitPrice(eq(testProduct), eq(testCartItem.getSpecs()))).thenReturn(new BigDecimal("15.00"));
         when(productService.deductStockWithRetry(eq(1L), eq(2), anyInt())).thenReturn(true);
-        when(memberService.calculateDiscount(eq(1L), any(BigDecimal.class))).thenReturn(BigDecimal.ZERO);
+        when(couponService.calculateDiscount(anyLong(), any(BigDecimal.class))).thenReturn(BigDecimal.ZERO);
+        when(promotionService.calculateBestPromotion(anyList())).thenReturn(promotionResult);
+        when(memberService.calculateDiscount(eq(1L), eq(new BigDecimal("25.00")))).thenReturn(new BigDecimal("2.00"));
         when(orderMapper.insert(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(1L);
@@ -164,15 +180,22 @@ class OrderControllerTest {
         });
         when(orderItemMapper.insert(any(OrderItem.class))).thenReturn(1);
         when(cartItemMapper.deleteById(1L)).thenReturn(1);
-        
+
         var result = orderController.createOrder(new Order());
-        
+
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertEquals(OrderStatus.PENDING_PAYMENT, result.getData().getStatus());
+        assertEquals(new BigDecimal("30.00"), result.getData().getTotalAmount());
+        assertEquals(new BigDecimal("7.00"), result.getData().getDiscountAmount());
+        assertEquals(new BigDecimal("23.00"), result.getData().getPayAmount());
+        assertEquals(11L, result.getData().getPromotionId());
+        assertEquals(new BigDecimal("5.00"), result.getData().getPromotionDiscount());
         verify(orderMapper, times(1)).insert(any(Order.class));
         verify(orderItemMapper, times(1)).insert(any(OrderItem.class));
         verify(cartItemMapper, times(1)).deleteById(1L);
+        verify(promotionService, times(1)).calculateBestPromotion(anyList());
+        verify(memberService, times(1)).calculateDiscount(1L, new BigDecimal("25.00"));
     }
 
     @Test

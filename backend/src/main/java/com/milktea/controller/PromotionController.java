@@ -3,6 +3,8 @@ package com.milktea.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.common.Result;
+import com.milktea.dto.PromotionCalculateRequest;
+import com.milktea.dto.PromotionCalculateResponse;
 import com.milktea.entity.CartItem;
 import com.milktea.entity.Product;
 import com.milktea.entity.Promotion;
@@ -136,23 +138,33 @@ public class PromotionController {
     }
 
     @PostMapping("/calculate")
-    public Result<Map<String, Object>> calculatePromotion(@RequestBody Map<String, Object> params) {
+    public Result<PromotionCalculateResponse> calculatePromotion(@RequestBody(required = false) PromotionCalculateRequest request) {
         Long userId = getCurrentUserId();
         List<PromotionCalculator.CartItemInfo> cartItems = buildCartItems(userId);
+
+        BigDecimal orderAmount = cartItems.stream()
+                .map(PromotionCalculator.CartItemInfo::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        PromotionCalculateResponse response = new PromotionCalculateResponse();
+        response.setOrderAmount(orderAmount);
+        response.setDiscountAmount(BigDecimal.ZERO);
+        response.setFinalAmount(orderAmount);
+        response.setApplied(false);
+
         if (cartItems.isEmpty()) {
-            return Result.success(Map.of("discountAmount", BigDecimal.ZERO, "applied", false));
+            return Result.success(response);
         }
 
         PromotionCalculator.PromotionResult promoResult = promotionService.calculateBestPromotion(cartItems);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("discountAmount", promoResult.getDiscountAmount());
-        result.put("applied", promoResult.isApplied());
+        response.setDiscountAmount(promoResult.getDiscountAmount());
+        response.setApplied(promoResult.isApplied());
+        response.setFinalAmount(orderAmount.subtract(promoResult.getDiscountAmount()));
         if (promoResult.getPromotion() != null) {
-            result.put("promotionId", promoResult.getPromotion().getId());
-            result.put("promotionName", promoResult.getPromotion().getName());
+            response.setPromotionId(promoResult.getPromotion().getId());
+            response.setPromotionName(promoResult.getPromotion().getName());
         }
-        return Result.success(result);
+        return Result.success(response);
     }
 
     private List<PromotionCalculator.CartItemInfo> buildCartItems(Long userId) {

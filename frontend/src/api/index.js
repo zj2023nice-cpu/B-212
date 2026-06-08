@@ -65,7 +65,7 @@ export const batchCheckFavorite = (productIds) => request.post('/favorites/batch
 
 export const getActivePromotions = () => request.get('/promotions/active')
 export const getCartPromotionHint = () => request.get('/promotions/cart-hint')
-export const calculatePromotion = () => request.post('/promotions/calculate')
+export const calculatePromotion = (data) => request.post('/promotions/calculate', data)
 export const adminListPromotions = (params) => request.get('/promotions', { params })
 export const adminCreatePromotion = (data) => request.post('/promotions', data)
 export const adminUpdatePromotionStatus = (id, status) => request.put(`/promotions/${id}/status`, null, { params: { status } })
