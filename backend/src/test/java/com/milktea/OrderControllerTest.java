@@ -307,40 +307,10 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("测试 getOrderDetail - 订单不存在")
-    void testGetOrderDetail_OrderNotFound() {
-        setupUserAuthentication();
-        when(orderMapper.selectById(999L)).thenReturn(null);
-        
-        var result = orderController.getOrderDetail(999L);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Order not found", result.getMessage());
-    }
-
-    @Test
-    @DisplayName("测试 getOrderDetail - 无权访问")
-    void testGetOrderDetail_NotAuthorized() {
-        setupUserAuthentication();
-        Order otherUserOrder = new Order();
-        otherUserOrder.setId(2L);
-        otherUserOrder.setUserId(999L);
-        
-        when(orderMapper.selectById(2L)).thenReturn(otherUserOrder);
-        when(authentication.getAuthorities()).thenReturn(new ArrayList<>());
-        
-        var result = orderController.getOrderDetail(2L);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Not authorized to view this order", result.getMessage());
-    }
-
-    @Test
     @DisplayName("测试 getOrderDetail - 成功获取订单详情")
     void testGetOrderDetail_Success() {
         setupUserAuthentication();
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
-        when(authentication.getAuthorities()).thenReturn(new ArrayList<>());
         
         var result = orderController.getOrderDetail(1L);
         
@@ -350,26 +320,9 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("测试 getOrderDetail - 管理员可以查看任何订单")
-    void testGetOrderDetail_AdminCanViewAnyOrder() {
-        setupAdminAuthentication();
-        Order otherUserOrder = new Order();
-        otherUserOrder.setId(2L);
-        otherUserOrder.setUserId(999L);
-        
-        when(orderMapper.selectById(2L)).thenReturn(otherUserOrder);
-        
-        var result = orderController.getOrderDetail(2L);
-        
-        assertTrue(result.isSuccess());
-        assertNotNull(result.getData());
-    }
-
-    @Test
     @DisplayName("测试 getOrderItems - 获取订单项")
     void testGetOrderItems() {
         setupUserAuthentication();
-        when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(orderItemMapper.selectList(any(LambdaQueryWrapper.class)))
             .thenReturn(Collections.singletonList(testOrderItem));
         
@@ -378,18 +331,6 @@ class OrderControllerTest {
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertEquals(1, result.getData().size());
-    }
-
-    @Test
-    @DisplayName("测试 updateStatus - 订单不存在")
-    void testUpdateStatus_OrderNotFound() {
-        setupUserAuthentication();
-        when(orderMapper.selectById(999L)).thenReturn(null);
-        
-        var result = orderController.updateStatus(999L, "DELIVERING");
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Order not found", result.getMessage());
     }
 
     @Test

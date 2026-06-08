@@ -326,14 +326,6 @@ public class OrderController {
             notAuthorizedMessage = "Not authorized to view this order")
     public Result<Order> getOrderDetail(@PathVariable Long id) {
         Order order = orderMapper.selectById(id);
-        if (order == null) {
-            return Result.error("Order not found");
-        }
-        Long currentUserId = SecurityUtils.getCurrentUserId();
-        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
-        if (!isAdmin && !order.getUserId().equals(currentUserId)) {
-            return Result.error("Not authorized to view this order");
-        }
         return Result.success(order);
     }
 
@@ -379,15 +371,6 @@ public class OrderController {
             notFoundMessage = "Order not found",
             notAuthorizedMessage = "Not authorized to view this order's items")
     public Result<List<OrderItem>> getOrderItems(@PathVariable Long id) {
-        Order order = orderMapper.selectById(id);
-        if (order == null) {
-            return Result.error("Order not found");
-        }
-        Long currentUserId = SecurityUtils.getCurrentUserId();
-        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
-        if (!isAdmin && !order.getUserId().equals(currentUserId)) {
-            return Result.error("Not authorized to view this order's items");
-        }
         return Result.success(orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id)));
     }
 
@@ -397,14 +380,6 @@ public class OrderController {
             notAuthorizedMessage = "Not authorized to view this receipt")
     public Result<ReceiptVO> getReceipt(@PathVariable Long id) {
         Order order = orderMapper.selectById(id);
-        if (order == null) {
-            return Result.error("Order not found");
-        }
-        Long currentUserId = SecurityUtils.getCurrentUserId();
-        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
-        if (!isAdmin && !order.getUserId().equals(currentUserId)) {
-            return Result.error("Not authorized to view this receipt");
-        }
 
         List<OrderItem> orderItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id));
@@ -474,13 +449,6 @@ public class OrderController {
     public Result<String> updateStatus(@PathVariable Long id, @RequestParam String status) {
         boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
         Order existingOrder = orderMapper.selectById(id);
-        if (existingOrder == null) {
-            return Result.error("Order not found");
-        }
-        Long currentUserId = SecurityUtils.getCurrentUserId();
-        if (!isAdmin && !existingOrder.getUserId().equals(currentUserId)) {
-            return Result.error("Not authorized to update this order");
-        }
         
         OrderStatus targetStatus;
         try {

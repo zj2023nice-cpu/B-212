@@ -122,13 +122,6 @@ public class CartController {
         }
 
         CartItem existingCartItem = cartItemMapper.selectById(id);
-        if (existingCartItem == null) {
-            return Result.error("Cart item not found");
-        }
-
-        if (!existingCartItem.getUserId().equals(SecurityUtils.getCurrentUserId())) {
-            return Result.error("Not authorized to update this cart item");
-        }
 
         try {
             productService.checkStock(existingCartItem.getProductId(), quantity);
@@ -151,13 +144,6 @@ public class CartController {
             notAuthorizedMessage = "Not authorized to delete this cart item",
             allowAdmin = false)
     public Result<String> removeFromCart(@PathVariable Long id) {
-        CartItem existingCartItem = cartItemMapper.selectById(id);
-        if (existingCartItem == null) {
-            return Result.error("Cart item not found");
-        }
-        if (!existingCartItem.getUserId().equals(SecurityUtils.getCurrentUserId())) {
-            return Result.error("Not authorized to delete this cart item");
-        }
         cartItemMapper.deleteById(id);
         return Result.success("Removed");
     }

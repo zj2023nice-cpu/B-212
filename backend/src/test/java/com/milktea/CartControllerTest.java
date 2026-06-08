@@ -256,34 +256,6 @@ class CartControllerTest {
     }
 
     @Test
-    @DisplayName("测试 updateQuantity - 购物车项不存在")
-    void testUpdateQuantity_CartItemNotFound() {
-        when(cartItemMapper.selectById(999L)).thenReturn(null);
-        
-        var result = cartController.updateQuantity(999L, 5);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Cart item not found", result.getMessage());
-    }
-
-    @Test
-    @DisplayName("测试 updateQuantity - 无权操作")
-    void testUpdateQuantity_NotAuthorized() {
-        CartItem otherUserCartItem = new CartItem();
-        otherUserCartItem.setId(2L);
-        otherUserCartItem.setUserId(999L);
-        otherUserCartItem.setProductId(1L);
-        otherUserCartItem.setQuantity(2);
-        
-        when(cartItemMapper.selectById(2L)).thenReturn(otherUserCartItem);
-        
-        var result = cartController.updateQuantity(2L, 5);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Not authorized to update this cart item", result.getMessage());
-    }
-
-    @Test
     @DisplayName("测试 updateQuantity - 更新成功")
     void testUpdateQuantity_Success() {
         when(cartItemMapper.selectById(1L)).thenReturn(testCartItem);
@@ -311,35 +283,8 @@ class CartControllerTest {
     }
 
     @Test
-    @DisplayName("测试 removeFromCart - 购物车项不存在")
-    void testRemoveFromCart_CartItemNotFound() {
-        when(cartItemMapper.selectById(999L)).thenReturn(null);
-        
-        var result = cartController.removeFromCart(999L);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Cart item not found", result.getMessage());
-    }
-
-    @Test
-    @DisplayName("测试 removeFromCart - 无权操作")
-    void testRemoveFromCart_NotAuthorized() {
-        CartItem otherUserCartItem = new CartItem();
-        otherUserCartItem.setId(2L);
-        otherUserCartItem.setUserId(999L);
-        
-        when(cartItemMapper.selectById(2L)).thenReturn(otherUserCartItem);
-        
-        var result = cartController.removeFromCart(2L);
-        
-        assertFalse(result.isSuccess());
-        assertEquals("Not authorized to delete this cart item", result.getMessage());
-    }
-
-    @Test
     @DisplayName("测试 removeFromCart - 删除成功")
     void testRemoveFromCart_Success() {
-        when(cartItemMapper.selectById(1L)).thenReturn(testCartItem);
         when(cartItemMapper.deleteById(1L)).thenReturn(1);
         
         var result = cartController.removeFromCart(1L);

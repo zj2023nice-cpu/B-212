@@ -3,6 +3,8 @@ package com.milktea.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.milktea.annotation.ResourceOwnerCheck;
+import com.milktea.annotation.ResourceType;
 import com.milktea.common.Result;
 import com.milktea.dto.FeedbackSubmitDTO;
 import com.milktea.dto.FeedbackVO;
@@ -232,16 +234,10 @@ public class FeedbackController {
     }
 
     @GetMapping("/order/{orderId}")
+    @ResourceOwnerCheck(resourceType = ResourceType.ORDER, idParam = "orderId",
+            notFoundMessage = "Order not found",
+            notAuthorizedMessage = "Not authorized")
     public Result<List<FeedbackVO>> getOrderFeedbacks(@PathVariable Long orderId) {
-        Long userId = SecurityUtils.getCurrentUserId();
-        Order order = orderMapper.selectById(orderId);
-        if (order == null) {
-            return Result.error("Order not found");
-        }
-        if (!order.getUserId().equals(userId)) {
-            return Result.error("Not authorized");
-        }
-
         List<Feedback> feedbacks = feedbackMapper.selectList(
                 new LambdaQueryWrapper<Feedback>()
                         .eq(Feedback::getOrderId, orderId)

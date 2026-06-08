@@ -590,6 +590,37 @@ class FeedbackControllerTest {
         assertEquals("回复内容不能为空", result.getMessage());
     }
 
+    @Test
+    @DisplayName("测试 getOrderFeedbacks - 获取订单评价列表")
+    void testGetOrderFeedbacks_Success() {
+        testFeedback.setImages("[\"/uploads/img1.jpg\"]");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getOrderFeedbacks(1L);
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertEquals(1L, result.getData().get(0).getOrderId());
+        assertEquals("用户1", result.getData().get(0).getNickname());
+    }
+
+    @Test
+    @DisplayName("测试 getOrderFeedbacks - 订单无评价")
+    void testGetOrderFeedbacks_Empty() {
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(new ArrayList<>());
+
+        var result = feedbackController.getOrderFeedbacks(999L);
+
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+        assertTrue(result.getData().isEmpty());
+    }
+
     private FeedbackSubmitDTO buildFeedbackDTO(Long orderId, Long productId, Integer rating, String content, List<String> images) {
         FeedbackSubmitDTO dto = new FeedbackSubmitDTO();
         dto.setOrderId(orderId);
