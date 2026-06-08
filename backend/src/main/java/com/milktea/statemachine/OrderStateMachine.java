@@ -36,6 +36,13 @@ public class OrderStateMachine {
         }
     }
 
+    private static final Set<OrderStatus> CANCELLABLE_STATES = EnumSet.of(
+            OrderStatus.PENDING_PAYMENT,
+            OrderStatus.PAID,
+            OrderStatus.PREPARING,
+            OrderStatus.DELIVERING
+    );
+
     public static boolean isUserAllowedTransition(OrderStatus from, OrderStatus to) {
         if (!canTransit(from, to)) {
             return false;
@@ -43,7 +50,7 @@ public class OrderStateMachine {
         if (to == OrderStatus.PAID && from == OrderStatus.PENDING_PAYMENT) {
             return true;
         }
-        if (to == OrderStatus.CANCELLED && from != OrderStatus.CANCELLED && from != OrderStatus.REVIEWED) {
+        if (to == OrderStatus.CANCELLED && CANCELLABLE_STATES.contains(from)) {
             return true;
         }
         if (to == OrderStatus.COMPLETED && from == OrderStatus.DELIVERING) {

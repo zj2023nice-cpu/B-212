@@ -41,7 +41,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "FROM order_items oi " +
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
-            "WHERE o.user_id = #{userId} AND o.status NOT IN (0, 3) " +
+            "WHERE o.user_id = #{userId} AND o.status NOT IN ('PENDING_PAYMENT', 'CANCELLED') " +
             "GROUP BY p.category_id " +
             "ORDER BY totalSales DESC")
     List<CategoryPreferenceVO> selectUserCategoryPreference(@Param("userId") Long userId);
@@ -74,7 +74,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "FROM order_items oi " +
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
-            "WHERE o.status NOT IN (0, 3) AND o.create_time >= #{startDate} " +
+            "WHERE o.status NOT IN ('PENDING_PAYMENT', 'CANCELLED') AND o.create_time >= #{startDate} " +
             "GROUP BY oi.product_id, oi.product_name, p.image " +
             "ORDER BY totalSales DESC LIMIT #{limit}")
     List<TopProductVO> selectTopProducts(@Param("startDate") LocalDateTime startDate,
