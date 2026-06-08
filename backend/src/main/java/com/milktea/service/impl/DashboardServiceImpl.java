@@ -79,8 +79,10 @@ public class DashboardServiceImpl implements DashboardService {
     private DashboardVO buildDashboardData() {
         DashboardVO vo = new DashboardVO();
 
-        vo.setTodayOrderCount(orderMapper.countTodayOrders());
-        vo.setTodaySalesAmount(orderMapper.sumTodaySales());
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime tomorrowStart = LocalDate.now().plusDays(1).atStartOfDay();
+        vo.setTodayOrderCount(orderMapper.countTodayOrders(todayStart, tomorrowStart));
+        vo.setTodaySalesAmount(orderMapper.sumTodaySales(todayStart, tomorrowStart));
         vo.setPendingOrderCount(orderMapper.countPendingOrders());
         vo.setRegisteredUserCount(userMapper.countAllUsers());
 
@@ -88,8 +90,7 @@ public class DashboardServiceImpl implements DashboardService {
         List<DailySalesVO> rawTrend = orderMapper.selectDailySalesTrend(weekAgo);
         vo.setWeeklyTrend(fillMissingDays(rawTrend, weekAgo));
 
-        LocalDateTime sevenDaysAgo = LocalDate.now().minusDays(7).atStartOfDay();
-        vo.setTopProducts(orderItemMapper.selectTopProducts(sevenDaysAgo, 5));
+        vo.setTopProducts(orderItemMapper.selectTopProducts(weekAgo, 5));
 
         return vo;
     }
