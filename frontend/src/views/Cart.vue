@@ -2,19 +2,23 @@
   <div class="max-w-3xl mx-auto">
     <h2 class="text-2xl font-bold mb-6 text-gray-800">购物车</h2>
     
-    <div v-if="cartStore.items.length > 0" class="space-y-4">
-      <div v-for="item in cartItemsWithProduct" :key="item.id" class="glass-card p-4 flex items-center gap-4">
-        <img :src="item.product?.image" class="w-20 h-20 rounded-xl object-cover" />
-        <div class="flex-grow">
-          <h3 class="font-bold text-gray-800">{{ item.product?.name }}</h3>
-          <p class="text-gray-400 text-xs mt-1">{{ formatSpecs(item.specs) }}</p>
-          <div class="mt-2 text-primary font-bold">¥{{ item.product?.price }}</div>
+    <div v-if="cartStore.groups.length > 0" class="space-y-4">
+      <div v-for="group in cartStore.groups" :key="group.productId" class="glass-card p-4">
+        <div class="flex items-center gap-4">
+          <img :src="group.image" class="w-20 h-20 rounded-xl object-cover" />
+          <div class="flex-grow">
+            <h3 class="font-bold text-gray-800">{{ group.productName }}</h3>
+            <div class="mt-1 text-primary font-bold">¥{{ group.price }}</div>
+          </div>
         </div>
-        <div class="flex items-center gap-3">
-          <el-input-number v-model="item.quantity" :min="1" size="small" @change="(val) => handleUpdateQuantity(item.id, val)" />
-          <el-button type="danger" link @click="handleRemove(item.id)">
-            <el-icon><Delete /></el-icon>
-          </el-button>
+        <div class="mt-3 space-y-2">
+          <div v-for="spec in group.specs" :key="spec.id" class="flex items-center gap-3 pl-2 py-2 border-t border-gray-100">
+            <span class="text-gray-500 text-sm flex-grow">{{ formatSpecs(spec.specs) }}</span>
+            <el-input-number v-model="spec.quantity" :min="1" size="small" @change="(val) => handleUpdateQuantity(spec.id, val)" />
+            <el-button type="danger" link @click="handleRemove(spec.id)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -101,7 +105,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useCartStore } from '@/store/cart'
 import { useAddressStore } from '@/store/address'
-import { getProducts, updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount } from '@/api'
+import { updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount } from '@/api'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AddressDialog from '@/views/AddressDialog.vue'
@@ -109,7 +113,6 @@ import AddressDialog from '@/views/AddressDialog.vue'
 const cartStore = useCartStore()
 const addressStore = useAddressStore()
 const router = useRouter()
-const allProducts = ref([])
 const checkoutVisible = ref(false)
 const remark = ref('')
 const submitting = ref(false)
@@ -122,15 +125,8 @@ const memberLevelName = ref('普通会员')
 const addressDialogVisible = ref(false)
 const selectedAddress = ref(null)
 
-const cartItemsWithProduct = computed(() => {
-  return cartStore.items.map(item => ({
-    ...item,
-    product: allProducts.value.find(p => p.id === item.productId)
-  }))
-})
-
 const totalPrice = computed(() => {
-  return cartItemsWithProduct.value.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0).toFixed(2)
+  return cartStore.groups.reduce((sum, g) => sum + (g.price || 0) * (g.specs || []).reduce((s, item) => s + item.quantity, 0), 0).toFixed(2)
 })
 
 const finalPrice = computed(() => {
@@ -260,7 +256,5 @@ const confirmOrder = async () => {
 
 onMounted(async () => {
   await cartStore.fetchCart()
-  const prods = await getProducts()
-  allProducts.value = prods
 })
 </script>

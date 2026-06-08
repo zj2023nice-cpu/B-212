@@ -2,6 +2,7 @@ package com.milktea;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.milktea.controller.CartController;
+import com.milktea.dto.CartGroupVO;
 import com.milktea.entity.CartItem;
 import com.milktea.entity.Product;
 import com.milktea.exception.InsufficientStockException;
@@ -89,6 +90,7 @@ class CartControllerTest {
         cartItems.add(testCartItem);
         
         when(cartItemMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(cartItems);
+        when(productMapper.selectById(1L)).thenReturn(testProduct);
         
         var result = cartController.getCart();
         
@@ -96,6 +98,8 @@ class CartControllerTest {
         assertNotNull(result.getData());
         assertEquals(1, result.getData().size());
         assertEquals(1L, result.getData().get(0).getProductId());
+        assertEquals("珍珠奶茶", result.getData().get(0).getProductName());
+        assertEquals(1, result.getData().get(0).getSpecs().size());
     }
 
     @Test
@@ -108,6 +112,40 @@ class CartControllerTest {
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertTrue(result.getData().isEmpty());
+    }
+
+    @Test
+    @DisplayName("测试 getCart - 同商品不同规格合并为一个分组")
+    void testGetCart_SameProductDifferentSpecsGrouped() {
+        CartItem item1 = new CartItem();
+        item1.setId(1L);
+        item1.setUserId(1L);
+        item1.setProductId(1L);
+        item1.setQuantity(2);
+        item1.setSpecs("中杯, 少糖");
+
+        CartItem item2 = new CartItem();
+        item2.setId(2L);
+        item2.setUserId(1L);
+        item2.setProductId(1L);
+        item2.setQuantity(1);
+        item2.setSpecs("大杯, 全糖");
+
+        List<CartItem> cartItems = new ArrayList<>();
+        cartItems.add(item1);
+        cartItems.add(item2);
+
+        when(cartItemMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(cartItems);
+        when(productMapper.selectById(1L)).thenReturn(testProduct);
+
+        var result = cartController.getCart();
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        CartGroupVO group = result.getData().get(0);
+        assertEquals(1L, group.getProductId());
+        assertEquals("珍珠奶茶", group.getProductName());
+        assertEquals(2, group.getSpecs().size());
     }
 
     @Test

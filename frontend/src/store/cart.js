@@ -3,16 +3,17 @@ import { getCart, addToCart, updateCartItem, removeCartItem, clearCart } from '@
 
 export const useCartStore = defineStore('cart', {
   state: () => ({
-    items: []
+    groups: []
   }),
   getters: {
-    totalCount: (state) => state.items.reduce((sum, item) => sum + item.quantity, 0),
-    totalPrice: (state) => state.items.reduce((sum, item) => sum + (item.quantity * 10), 0) // 这里需要关联商品价格，简化处理
+    allItems: (state) => state.groups.flatMap(g => g.specs || []),
+    totalCount: (state) => state.groups.reduce((sum, g) => sum + (g.specs || []).reduce((s, item) => s + item.quantity, 0), 0),
+    totalPrice: (state) => state.groups.reduce((sum, g) => sum + (g.price || 0) * (g.specs || []).reduce((s, item) => s + item.quantity, 0), 0)
   },
   actions: {
     async fetchCart() {
       const data = await getCart()
-      this.items = data
+      this.groups = data || []
     },
     async add(product, specs) {
       await addToCart({ productId: product.id, quantity: 1, specs: JSON.stringify(specs) })

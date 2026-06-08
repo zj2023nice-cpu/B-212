@@ -2,6 +2,7 @@ package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.milktea.common.Result;
+import com.milktea.dto.CartGroupVO;
 import com.milktea.entity.CartItem;
 import com.milktea.entity.Product;
 import com.milktea.exception.InsufficientStockException;
@@ -9,13 +10,17 @@ import com.milktea.mapper.CartItemMapper;
 import com.milktea.mapper.ProductMapper;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -45,8 +50,28 @@ public class CartController {
     }
 
     @GetMapping
-    public Result<List<CartItem>> getCart() {
-        return Result.success(cartItemMapper.selectList(new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, getCurrentUserId())));
+    public Result<List<CartGroupVO>> getCart() {
+        Long userId = getCurrentUserId();
+        List<CartItem> cartItems = cartItemMapper.selectList(
+                new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, userId));
+
+        Map<Long, CartGroupVO> groupMap = new LinkedHashMap<>();
+        for (CartItem item : cartItems) {
+            CartGroupVO group = groupMap.get(item.getProductId());
+            if (group == null) {
+                Product product = productMapper.selectById(item.getProductId());
+                group = new CartGroupVO();
+                group.setProductId(item.getProductId());
+                group.setProductName(product != null ? product.getName() : "");
+                group.setImage(product != null ? product.getImage() : "");
+                group.setPrice(product != null ? product.getPrice() : java.math.BigDecimal.ZERO);
+                group.setSpecs(new ArrayList<>());
+                groupMap.put(item.getProductId(), group);
+            }
+            group.getSpecs().add(item);
+        }
+
+        return Result.success(new ArrayList<>(groupMap.values()));
     }
 
     @PostMapping
