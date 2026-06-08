@@ -94,6 +94,13 @@
         </div>
       </div>
 
+      <div class="p-4 text-center border-t">
+        <el-button plain @click="router.push(`/order/${route.params.id}/receipt`)">
+          <el-icon class="mr-1"><Printer /></el-icon>
+          打印小票
+        </el-button>
+      </div>
+
       <div v-if="order?.status === 'PENDING_PAYMENT'" class="p-8 text-center border-t">
         <p class="text-sm text-gray-400 mb-4">订单待支付，请尽快完成支付</p>
         <div class="flex justify-center gap-4">
@@ -185,7 +192,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOrderDetail, getOrderItems, updateOrderStatus, submitFeedback } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning, EditPen, CircleCheck, Shop, Clock, Location } from '@element-plus/icons-vue'
+import { Warning, EditPen, CircleCheck, Shop, Clock, Location, Printer } from '@element-plus/icons-vue'
 import ReviewForm from '@/components/ReviewForm.vue'
 
 const route = useRoute()

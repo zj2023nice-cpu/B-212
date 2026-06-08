@@ -18,6 +18,7 @@ export const createOrder = (data) => request.post('/orders', data)
 export const getMyOrders = (params) => request.get('/orders', { params })
 export const getOrderDetail = (id) => request.get(`/orders/${id}`)
 export const getOrderItems = (id) => request.get(`/orders/${id}/items`)
+export const getOrderReceipt = (id) => request.get(`/orders/${id}/receipt`)
 export const updateOrderStatus = (id, status) => request.put(`/orders/${id}/status`, null, { params: { status } })
 
 export const submitFeedback = (data) => request.post('/feedbacks', data)

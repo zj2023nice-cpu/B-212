@@ -12,6 +12,11 @@ const routes = [
     component: () => import('../views/Register.vue')
   },
   {
+    path: '/order/:id/receipt',
+    name: 'OrderReceipt',
+    component: () => import('../views/ReceiptView.vue')
+  },
+  {
     path: '/',
     component: () => import('../layout/MainLayout.vue'),
     children: [

@@ -3,6 +3,7 @@ package com.milktea.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.common.Result;
+import com.milktea.dto.ReceiptVO;
 import com.milktea.entity.*;
 import com.milktea.enums.DeliveryType;
 import com.milktea.enums.OrderStatus;
@@ -407,6 +408,80 @@ public class OrderController {
         }
         
         return Result.success(orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id)));
+    }
+
+    @GetMapping("/{id}/receipt")
+    public Result<ReceiptVO> getReceipt(@PathVariable Long id) {
+        Long currentUserId = getCurrentUserId();
+        boolean isAdmin = isCurrentUserAdmin();
+        Order order = orderMapper.selectById(id);
+
+        if (order == null) {
+            return Result.error("Order not found");
+        }
+
+        if (!isAdmin && !order.getUserId().equals(currentUserId)) {
+            return Result.error("Not authorized to view this receipt");
+        }
+
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id));
+
+        ReceiptVO receipt = new ReceiptVO();
+        receipt.setStoreName("奶茶小站");
+        receipt.setStorePhone("400-888-6666");
+        receipt.setOrderSn(order.getOrderSn());
+        receipt.setOrderTime(order.getCreateTime() != null
+                ? order.getCreateTime().toString().replace("T", " ")
+                : "");
+        receipt.setDeliveryType(order.getDeliveryType() == DeliveryType.SELF_PICKUP ? "门店自提" : "外卖配送");
+        receipt.setPickupStore(order.getPickupStore());
+        receipt.setPickupTime(order.getPickupTime() != null
+                ? order.getPickupTime().toString().replace("T", " ")
+                : null);
+        receipt.setContactName(order.getAddressContactName());
+        receipt.setContactPhone(order.getAddressPhone());
+        receipt.setAddress(order.getAddress() != null ? order.getAddress() : order.getAddressFull());
+        receipt.setRemark(order.getRemark());
+
+        List<ReceiptVO.ReceiptItemVO> itemVOs = new ArrayList<>();
+        for (OrderItem item : orderItems) {
+            ReceiptVO.ReceiptItemVO vo = new ReceiptVO.ReceiptItemVO();
+            vo.setProductName(item.getProductName());
+            vo.setSpecs(formatItemSpecs(item.getSpecs()));
+            vo.setQuantity(item.getQuantity());
+            vo.setUnitPrice(item.getProductPrice());
+            vo.setSubtotal(item.getProductPrice().multiply(new BigDecimal(item.getQuantity())));
+            itemVOs.add(vo);
+        }
+        receipt.setItems(itemVOs);
+        receipt.setTotalAmount(order.getTotalAmount());
+        receipt.setDiscountAmount(order.getDiscountAmount());
+        receipt.setPayAmount(order.getPayAmount());
+
+        return Result.success(receipt);
+    }
+
+    private String formatItemSpecs(String specs) {
+        if (specs == null || specs.isEmpty()) return "";
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.Map<String, Object> map = mapper.readValue(specs, java.util.Map.class);
+            java.util.List<String> parts = new java.util.ArrayList<>();
+            if (map.containsKey("size")) parts.add(String.valueOf(map.get("size")));
+            if (map.containsKey("temp")) parts.add(String.valueOf(map.get("temp")));
+            if (map.containsKey("sugar")) parts.add(String.valueOf(map.get("sugar")));
+            if (map.containsKey("topping")) {
+                Object topping = map.get("topping");
+                if (topping instanceof java.util.List) {
+                    String toppingStr = String.join("/", (java.util.List<String>) topping);
+                    if (!toppingStr.isEmpty()) parts.add(toppingStr);
+                }
+            }
+            return String.join(" / ", parts);
+        } catch (Exception e) {
+            return specs;
+        }
     }
 
     @PutMapping("/{id}/status")
