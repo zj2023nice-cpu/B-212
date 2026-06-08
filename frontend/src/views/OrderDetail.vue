@@ -94,8 +94,8 @@
         </div>
       </div>
 
-      <div class="p-4 text-center border-t">
-        <el-button plain @click="router.push(`/order/${route.params.id}/receipt`)">
+      <div class="p-4 text-center border-t no-print">
+        <el-button plain @click="handlePrint">
           <el-icon class="mr-1"><Printer /></el-icon>
           打印小票
         </el-button>
@@ -184,15 +184,125 @@
         </div>
       </template>
     </el-dialog>
+
+    <div v-if="showReceipt" class="receipt-overlay no-print" @click.self="closeReceipt">
+      <div class="receipt-modal">
+        <div class="receipt-modal-header">
+          <span>小票预览</span>
+          <el-button text @click="closeReceipt">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+        <div class="receipt-wrapper">
+          <div class="receipt" id="receipt-content">
+            <div class="receipt-header">
+              <div class="store-name">{{ receiptData.storeName }}</div>
+              <div class="store-phone">TEL: {{ receiptData.storePhone }}</div>
+            </div>
+
+            <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+
+            <div class="receipt-info">
+              <div class="receipt-row">
+                <span>单号:</span>
+                <span class="receipt-value">{{ receiptData.orderSn }}</span>
+              </div>
+              <div class="receipt-row">
+                <span>时间:</span>
+                <span class="receipt-value">{{ receiptData.orderTime }}</span>
+              </div>
+            </div>
+
+            <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+
+            <div class="receipt-section-title">商品明细</div>
+
+            <div class="receipt-items">
+              <div class="receipt-item" v-for="(item, index) in receiptData.items" :key="index">
+                <div class="item-name">{{ item.productName }}</div>
+                <div class="item-specs" v-if="item.specs">{{ item.specs }}</div>
+                <div class="item-detail">
+                  <span class="item-qty">x{{ item.quantity }}</span>
+                  <span class="item-price">{{ item.unitPrice }}</span>
+                  <span class="item-subtotal">{{ item.subtotal }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+
+            <div class="receipt-totals">
+              <div class="receipt-row">
+                <span>商品总额:</span>
+                <span class="receipt-value">¥{{ receiptData.totalAmount }}</span>
+              </div>
+              <div class="receipt-row" v-if="receiptData.discountAmount > 0">
+                <span>优惠减免:</span>
+                <span class="receipt-value discount">-¥{{ receiptData.discountAmount }}</span>
+              </div>
+              <div class="receipt-divider">--------------------------------</div>
+              <div class="receipt-row total">
+                <span>实付总计:</span>
+                <span class="receipt-value">¥{{ receiptData.payAmount }}</span>
+              </div>
+            </div>
+
+            <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+
+            <div class="receipt-delivery">
+              <div class="receipt-row">
+                <span>配送方式:</span>
+                <span class="receipt-value">{{ receiptData.deliveryType }}</span>
+              </div>
+              <template v-if="receiptData.deliveryType === '门店自提'">
+                <div class="receipt-row" v-if="receiptData.pickupStore">
+                  <span>自提门店:</span>
+                  <span class="receipt-value">{{ receiptData.pickupStore }}</span>
+                </div>
+                <div class="receipt-row" v-if="receiptData.pickupTime">
+                  <span>自提时间:</span>
+                  <span class="receipt-value">{{ receiptData.pickupTime }}</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="receipt-row" v-if="receiptData.contactName">
+                  <span>联系人:</span>
+                  <span class="receipt-value">{{ receiptData.contactName }} {{ receiptData.contactPhone }}</span>
+                </div>
+                <div class="receipt-row" v-if="receiptData.address">
+                  <span>地址:</span>
+                  <span class="receipt-value address-value">{{ receiptData.address }}</span>
+                </div>
+              </template>
+            </div>
+
+            <div class="receipt-remark" v-if="receiptData.remark">
+              <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+              <div class="receipt-row">
+                <span>备注:</span>
+                <span class="receipt-value">{{ receiptData.remark }}</span>
+              </div>
+            </div>
+
+            <div class="receipt-divider">- - - - - - - - - - - - - - - - - - - -</div>
+
+            <div class="receipt-footer">
+              <div>感谢您的惠顾，欢迎再次光临!</div>
+              <div class="receipt-qr-hint">--- 小票结束 ---</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOrderDetail, getOrderItems, updateOrderStatus, submitFeedback } from '@/api'
+import { getOrderDetail, getOrderItems, getOrderReceipt, updateOrderStatus, submitFeedback } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning, EditPen, CircleCheck, Shop, Clock, Location, Printer } from '@element-plus/icons-vue'
+import { Warning, EditPen, CircleCheck, Shop, Clock, Location, Printer, Close } from '@element-plus/icons-vue'
 import ReviewForm from '@/components/ReviewForm.vue'
 
 const route = useRoute()
@@ -202,6 +312,24 @@ const items = ref([])
 const cancelVisible = ref(false)
 const reviewVisible = ref(false)
 const submitting = ref(false)
+const showReceipt = ref(false)
+const receiptData = ref({
+  storeName: '',
+  storePhone: '',
+  orderSn: '',
+  orderTime: '',
+  deliveryType: '',
+  pickupStore: '',
+  pickupTime: '',
+  contactName: '',
+  contactPhone: '',
+  address: '',
+  remark: '',
+  items: [],
+  totalAmount: '0.00',
+  discountAmount: '0.00',
+  payAmount: '0.00'
+})
 
 const reviewRefs = ref({})
 
@@ -346,11 +474,250 @@ const handleSubmitReview = async () => {
   }
 }
 
+const handlePrint = async () => {
+  try {
+    const data = await getOrderReceipt(route.params.id)
+    receiptData.value = data
+    showReceipt.value = true
+    await nextTick()
+    window.print()
+  } catch (error) {
+    ElMessage.error('获取小票失败：' + (error.response?.data?.message || error.message))
+  }
+}
+
+const closeReceipt = () => {
+  showReceipt.value = false
+}
+
 onMounted(fetchData)
 </script>
 
 <style>
 .review-dialog {
   border-radius: 1.5rem !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt-overlay,
+  .receipt-overlay * {
+    visibility: visible;
+  }
+
+  .receipt-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    padding: 0;
+    z-index: 9999;
+  }
+
+  .receipt-overlay .no-print,
+  .receipt-overlay .receipt-modal-header {
+    display: none !important;
+  }
+
+  .receipt-overlay .receipt-modal {
+    background: #fff;
+    border-radius: 0;
+    padding: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .receipt-overlay .receipt-wrapper {
+    justify-content: flex-start;
+  }
+
+  .receipt-overlay .receipt {
+    box-shadow: none;
+    margin: 0;
+    padding: 8px;
+    width: 58mm;
+  }
+}
+</style>
+
+<style scoped>
+.receipt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 40px;
+  z-index: 2000;
+  overflow-y: auto;
+}
+
+.receipt-modal {
+  background: #f0f0f0;
+  border-radius: 12px;
+  padding: 16px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.receipt-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: bold;
+  font-size: 16px;
+  color: #333;
+}
+
+.receipt-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.receipt {
+  width: 232px;
+  background: #fff;
+  padding: 12px 10px;
+  font-family: 'Courier New', 'Lucida Console', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.receipt-header {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.store-name {
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.store-phone {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.receipt-divider {
+  border: none;
+  font-size: 10px;
+  letter-spacing: -1px;
+  color: #999;
+  text-align: center;
+  line-height: 1.2;
+  margin: 6px 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.receipt-info {
+  margin: 4px 0;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.receipt-value {
+  text-align: right;
+  word-break: break-all;
+}
+
+.address-value {
+  max-width: 140px;
+  text-align: right;
+}
+
+.receipt-section-title {
+  font-weight: bold;
+  text-align: center;
+  margin: 4px 0;
+}
+
+.receipt-items {
+  margin: 4px 0;
+}
+
+.receipt-item {
+  margin-bottom: 6px;
+}
+
+.item-name {
+  font-weight: bold;
+}
+
+.item-specs {
+  font-size: 10px;
+  color: #666;
+  margin-top: 1px;
+}
+
+.item-detail {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.item-qty {
+  flex: 1;
+}
+
+.item-price {
+  width: 60px;
+  text-align: right;
+}
+
+.item-subtotal {
+  width: 60px;
+  text-align: right;
+  font-weight: bold;
+}
+
+.receipt-totals {
+  margin: 4px 0;
+}
+
+.receipt-totals .receipt-row {
+  margin: 2px 0;
+}
+
+.receipt-totals .total {
+  font-weight: bold;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.discount {
+  color: #e53e3e;
+}
+
+.receipt-delivery {
+  margin: 4px 0;
+}
+
+.receipt-remark {
+  margin: 4px 0;
+}
+
+.receipt-footer {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.receipt-qr-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #999;
 }
 </style>
