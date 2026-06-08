@@ -3,6 +3,7 @@ package com.milktea.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.milktea.dto.CategoryPreferenceVO;
 import com.milktea.dto.HotProductVO;
+import com.milktea.dto.TopProductVO;
 import com.milktea.entity.OrderItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -67,4 +68,15 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
     List<HotProductVO> selectHotProductsByCategories(@Param("startDate") LocalDateTime startDate,
                                                      @Param("categoryIds") List<Long> categoryIds,
                                                      @Param("limit") int limit);
+
+    @Select("SELECT oi.product_id AS productId, oi.product_name AS productName, p.image AS image, " +
+            "SUM(oi.quantity) AS totalSales, SUM(oi.quantity * oi.product_price) AS totalRevenue " +
+            "FROM order_items oi " +
+            "JOIN orders o ON oi.order_id = o.id " +
+            "JOIN products p ON oi.product_id = p.id " +
+            "WHERE o.status NOT IN (0, 3) AND o.create_time >= #{startDate} " +
+            "GROUP BY oi.product_id, oi.product_name, p.image " +
+            "ORDER BY totalSales DESC LIMIT #{limit}")
+    List<TopProductVO> selectTopProducts(@Param("startDate") LocalDateTime startDate,
+                                          @Param("limit") int limit);
 }

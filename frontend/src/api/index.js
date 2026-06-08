@@ -60,3 +60,5 @@ export const removeFavorite = (productId) => request.delete(`/favorites/${produc
 export const getFavoriteList = (params) => request.get('/favorites', { params })
 export const checkFavorite = (productId) => request.get('/favorites/check', { params: { productId } })
 export const batchCheckFavorite = (productIds) => request.post('/favorites/batch-check', productIds)
+
+export const getDashboardData = () => request.get('/admin/dashboard')

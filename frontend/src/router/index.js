@@ -69,6 +69,12 @@ const routes = [
         path: 'favorites',
         name: 'MyFavorites',
         component: () => import('../views/MyFavorites.vue')
+      },
+      {
+        path: 'admin/dashboard',
+        name: 'Dashboard',
+        component: () => import('../views/Dashboard.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }
@@ -85,6 +91,13 @@ router.beforeEach((to, from, next) => {
     next()
   } else if (!token) {
     next({ name: 'Login' })
+  } else if (to.meta?.requiresAdmin) {
+    const user = JSON.parse(localStorage.getItem('user') || 'null')
+    if (user?.role === 'ADMIN') {
+      next()
+    } else {
+      next({ name: 'Home' })
+    }
   } else {
     next()
   }
