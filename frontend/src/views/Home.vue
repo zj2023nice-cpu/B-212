@@ -233,6 +233,7 @@ import { ref, onMounted, reactive } from 'vue'
 import { getCategories, getProducts, getHotRanking, getRecommendation } from '@/api'
 import { useCartStore } from '@/store/cart'
 import { ElMessage } from 'element-plus'
+import { Trophy, Star, Search, Plus } from '@element-plus/icons-vue'
 
 const cartStore = useCartStore()
 const categories = ref([])

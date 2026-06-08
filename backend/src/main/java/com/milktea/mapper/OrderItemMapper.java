@@ -22,7 +22,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
             "JOIN categories c ON p.category_id = c.id " +
-            "WHERE o.status != 3 " +
+            "WHERE o.status NOT IN (0, 3) " +
             "AND o.create_time &gt;= #{startDate} " +
             "AND p.status = 1 " +
             "<if test='categoryId != null'>" +
@@ -40,7 +40,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "FROM order_items oi " +
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
-            "WHERE o.user_id = #{userId} AND o.status != 3 " +
+            "WHERE o.user_id = #{userId} AND o.status NOT IN (0, 3) " +
             "GROUP BY p.category_id " +
             "ORDER BY totalSales DESC")
     List<CategoryPreferenceVO> selectUserCategoryPreference(@Param("userId") Long userId);
@@ -53,7 +53,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
             "JOIN categories c ON p.category_id = c.id " +
-            "WHERE o.status != 3 " +
+            "WHERE o.status NOT IN (0, 3) " +
             "AND o.create_time &gt;= #{startDate} " +
             "AND p.status = 1 " +
             "AND p.category_id IN " +
