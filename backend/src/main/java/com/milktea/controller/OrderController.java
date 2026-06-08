@@ -13,7 +13,9 @@ import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
 import com.milktea.service.AddressService;
 import com.milktea.service.NotificationService;
+import com.milktea.service.PromotionService;
 import com.milktea.statemachine.OrderStateMachine;
+import com.milktea.util.PromotionCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -71,6 +74,9 @@ public class OrderController {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private PromotionService promotionService;
 
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -154,8 +160,33 @@ public class OrderController {
         }
 
         BigDecimal afterCouponAmount = totalAmount.subtract(couponDiscountAmount);
-        BigDecimal memberDiscountAmount = memberService.calculateDiscount(userId, afterCouponAmount);
-        BigDecimal discountAmount = couponDiscountAmount.add(memberDiscountAmount);
+
+        BigDecimal promotionDiscountAmount = BigDecimal.ZERO;
+        Long appliedPromotionId = null;
+        try {
+            List<PromotionCalculator.CartItemInfo> promoCartItems = new ArrayList<>();
+            Map<Long, List<CartItem>> itemsByProduct = cartItems.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(CartItem::getProductId));
+            for (Map.Entry<Long, List<CartItem>> entry : itemsByProduct.entrySet()) {
+                Product p = productMapper.selectById(entry.getKey());
+                if (p == null) continue;
+                BigDecimal itemTotal = entry.getValue().stream()
+                        .map(ci -> ci.getUnitPrice().multiply(new BigDecimal(ci.getQuantity())))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                promoCartItems.add(new PromotionCalculator.CartItemInfo(p.getId(), p.getCategoryId(), itemTotal));
+            }
+            PromotionCalculator.PromotionResult promoResult = promotionService.calculateBestPromotion(promoCartItems);
+            if (promoResult.isApplied()) {
+                promotionDiscountAmount = promoResult.getDiscountAmount();
+                appliedPromotionId = promoResult.getPromotion().getId();
+            }
+        } catch (Exception e) {
+            logger.warn("促销活动计算失败，将不使用促销: {}", e.getMessage());
+        }
+
+        BigDecimal afterPromotionAmount = afterCouponAmount.subtract(promotionDiscountAmount);
+        BigDecimal memberDiscountAmount = memberService.calculateDiscount(userId, afterPromotionAmount);
+        BigDecimal discountAmount = couponDiscountAmount.add(promotionDiscountAmount).add(memberDiscountAmount);
 
         BigDecimal payAmount = totalAmount.subtract(discountAmount);
 
@@ -166,6 +197,8 @@ public class OrderController {
         order.setDiscountAmount(discountAmount);
         order.setPayAmount(payAmount);
         order.setUserCouponId(userCouponId);
+        order.setPromotionId(appliedPromotionId);
+        order.setPromotionDiscount(promotionDiscountAmount);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setRemark(orderReq.getRemark());
 

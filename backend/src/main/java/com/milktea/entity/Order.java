@@ -20,6 +20,8 @@ public class Order {
     private BigDecimal discountAmount;
     private BigDecimal payAmount;
     private Long userCouponId;
+    private Long promotionId;
+    private BigDecimal promotionDiscount;
     private OrderStatus status;
     private String remark;
     private String cancelReason;

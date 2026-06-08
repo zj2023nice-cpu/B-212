@@ -63,6 +63,14 @@ export const getFavoriteList = (params) => request.get('/favorites', { params })
 export const checkFavorite = (productId) => request.get('/favorites/check', { params: { productId } })
 export const batchCheckFavorite = (productIds) => request.post('/favorites/batch-check', productIds)
 
+export const getActivePromotions = () => request.get('/promotions/active')
+export const getCartPromotionHint = () => request.get('/promotions/cart-hint')
+export const calculatePromotion = () => request.post('/promotions/calculate')
+export const adminListPromotions = (params) => request.get('/promotions', { params })
+export const adminCreatePromotion = (data) => request.post('/promotions', data)
+export const adminUpdatePromotionStatus = (id, status) => request.put(`/promotions/${id}/status`, null, { params: { status } })
+export const adminDeletePromotion = (id) => request.delete(`/promotions/${id}`)
+
 export const getDashboardData = () => request.get('/admin/dashboard')
 
 export const adminListOrders = (params) => request.get('/orders/admin/list', { params })

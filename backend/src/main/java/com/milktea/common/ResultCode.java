@@ -93,6 +93,12 @@ public enum ResultCode {
     ADDRESS_LIMIT_EXCEEDED(12002, "收货地址数量已达上限"),
     ADDRESS_NOT_AUTHORIZED(12003, "无权操作此地址"),
 
+    PROMOTION_NOT_FOUND(14001, "促销活动不存在"),
+    PROMOTION_DISABLED(14002, "促销活动已禁用"),
+    PROMOTION_EXPIRED(14003, "促销活动已过期"),
+    PROMOTION_NOT_STARTED(14004, "促销活动未开始"),
+    PROMOTION_THRESHOLD_NOT_MET(14005, "未满足促销活动门槛"),
+
     FAVORITE_ALREADY_EXISTS(13001, "已收藏该商品"),
     FAVORITE_NOT_FOUND(13002, "收藏记录不存在"),
 

@@ -25,6 +25,13 @@
         </div>
       </div>
 
+      <div v-if="promotionHint && promotionHint.hasPromotion" class="glass-card p-4 mt-4 border-l-4 border-orange-400 bg-orange-50">
+        <div class="flex items-center gap-2">
+          <span class="text-orange-500 text-lg">🎉</span>
+          <span class="text-orange-700 text-sm font-medium">{{ promotionHint.hint }}</span>
+        </div>
+      </div>
+
       <div class="glass-card p-6 mt-8 flex items-center justify-between">
         <div>
           <span class="text-gray-500">共 {{ cartStore.totalCount }} 件商品</span>
@@ -97,7 +104,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="discountAmount > 0 || memberDiscountAmount > 0" label="">
+        <el-form-item v-if="discountAmount > 0 || promotionDiscountAmount > 0 || memberDiscountAmount > 0" label="">
           <div class="w-full flex items-center justify-between text-sm">
             <span class="text-gray-500">商品总额</span>
             <span>¥{{ totalPrice }}</span>
@@ -105,6 +112,10 @@
           <div v-if="discountAmount > 0" class="w-full flex items-center justify-between text-sm mt-2">
             <span class="text-gray-500">优惠券减免</span>
             <span class="text-red-500">-¥{{ discountAmount }}</span>
+          </div>
+          <div v-if="promotionDiscountAmount > 0" class="w-full flex items-center justify-between text-sm mt-2">
+            <span class="text-gray-500">促销优惠（{{ promotionName }}）</span>
+            <span class="text-red-500">-¥{{ promotionDiscountAmount }}</span>
           </div>
           <div v-if="memberDiscountAmount > 0" class="w-full flex items-center justify-between text-sm mt-2">
             <span class="text-gray-500">会员折扣({{ memberLevelName }} {{ (memberDiscountRate * 100).toFixed(0) }}%)</span>
@@ -133,10 +144,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useCartStore } from '@/store/cart'
 import { useAddressStore } from '@/store/address'
-import { updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount } from '@/api'
+import { updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount, getCartPromotionHint, calculatePromotion } from '@/api'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AddressDialog from '@/views/AddressDialog.vue'
@@ -150,6 +161,8 @@ const submitting = ref(false)
 const availableCoupons = ref([])
 const selectedCouponId = ref(null)
 const discountAmount = ref(0)
+const promotionDiscountAmount = ref(0)
+const promotionName = ref('')
 const memberDiscountAmount = ref(0)
 const memberDiscountRate = ref(0)
 const memberLevelName = ref('普通会员')
@@ -158,6 +171,8 @@ const selectedAddress = ref(null)
 const deliveryType = ref('DELIVERY')
 const pickupStore = ref(null)
 const pickupTime = ref(null)
+const promotionHint = ref(null)
+let hintFetchTimer = null
 const pickupStores = [
   '奶茶总店（中山路88号）',
   '城西分店（西湖大道12号）',
@@ -170,7 +185,7 @@ const totalPrice = computed(() => {
 })
 
 const finalPrice = computed(() => {
-  const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - memberDiscountAmount.value)
+  const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - promotionDiscountAmount.value - memberDiscountAmount.value)
   return val.toFixed(2)
 })
 
@@ -230,9 +245,35 @@ const fetchMemberDiscount = async (baseAmount) => {
   }
 }
 
+const fetchPromotionHint = async () => {
+  if (cartStore.groups.length === 0) {
+    promotionHint.value = null
+    return
+  }
+  try {
+    const data = await getCartPromotionHint()
+    promotionHint.value = data
+  } catch (e) {
+    promotionHint.value = null
+  }
+}
+
+const debouncedFetchHint = () => {
+  if (hintFetchTimer) clearTimeout(hintFetchTimer)
+  hintFetchTimer = setTimeout(() => {
+    fetchPromotionHint()
+  }, 300)
+}
+
+watch(() => cartStore.totalCount, () => {
+  debouncedFetchHint()
+})
+
 const handleCheckout = async () => {
   selectedCouponId.value = null
   discountAmount.value = 0
+  promotionDiscountAmount.value = 0
+  promotionName.value = ''
   deliveryType.value = 'DELIVERY'
   pickupStore.value = null
   pickupTime.value = null
@@ -268,13 +309,25 @@ const handleCheckout = async () => {
   } catch (e) {
     availableCoupons.value = []
   }
-  await fetchMemberDiscount(parseFloat(totalPrice.value))
+  try {
+    const promoData = await calculatePromotion()
+    if (promoData.applied) {
+      promotionDiscountAmount.value = parseFloat(promoData.discountAmount) || 0
+      promotionName.value = promoData.promotionName || ''
+    }
+  } catch (e) {
+    promotionDiscountAmount.value = 0
+    promotionName.value = ''
+  }
+  const afterPromotion = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - promotionDiscountAmount.value)
+  await fetchMemberDiscount(afterPromotion)
 }
 
 const handleCouponChange = async (val) => {
   if (!val) {
     discountAmount.value = 0
-    await fetchMemberDiscount(parseFloat(totalPrice.value))
+    const afterPromotion = Math.max(0, parseFloat(totalPrice.value) - promotionDiscountAmount.value)
+    await fetchMemberDiscount(afterPromotion)
     return
   }
   try {
@@ -283,12 +336,13 @@ const handleCouponChange = async (val) => {
       orderAmount: parseFloat(totalPrice.value)
     })
     discountAmount.value = parseFloat(data.discount) || 0
-    const afterCoupon = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value)
-    await fetchMemberDiscount(afterCoupon)
+    const afterCouponAndPromotion = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - promotionDiscountAmount.value)
+    await fetchMemberDiscount(afterCouponAndPromotion)
   } catch (e) {
     discountAmount.value = 0
     selectedCouponId.value = null
-    await fetchMemberDiscount(parseFloat(totalPrice.value))
+    const afterPromotion = Math.max(0, parseFloat(totalPrice.value) - promotionDiscountAmount.value)
+    await fetchMemberDiscount(afterPromotion)
   }
 }
 
@@ -347,5 +401,6 @@ const confirmOrder = async () => {
 
 onMounted(async () => {
   await cartStore.fetchCart()
+  await fetchPromotionHint()
 })
 </script>
