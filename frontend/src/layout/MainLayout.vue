@@ -11,6 +11,58 @@
         </div>
         
         <div class="flex items-center space-x-6">
+          <el-popover
+            placement="bottom"
+            :width="360"
+            trigger="click"
+            @show="handleNotificationPopoverShow"
+          >
+            <template #reference>
+              <el-badge :value="notificationStore.unreadCount" :hidden="notificationStore.unreadCount === 0" :max="99">
+                <el-button link>
+                  <el-icon size="20"><Bell /></el-icon>
+                </el-button>
+              </el-badge>
+            </template>
+            <div class="notification-popover">
+              <div class="flex items-center justify-between mb-3">
+                <span class="font-bold text-base">消息通知</span>
+                <el-button link type="primary" size="small" @click="markAllRead" :disabled="notificationStore.unreadCount === 0">全部已读</el-button>
+              </div>
+              <div v-if="notificationStore.recentList.length === 0" class="text-center text-gray-400 py-6">
+                暂无消息
+              </div>
+              <div v-else>
+                <div
+                  v-for="item in notificationStore.recentList"
+                  :key="item.id"
+                  class="flex items-start py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 rounded px-2 -mx-2"
+                  :class="{ 'bg-blue-50': item.isRead === 0 }"
+                  @click="handleNotificationClick(item)"
+                >
+                  <div class="flex-shrink-0 mt-1 mr-3">
+                    <el-icon :size="18" :color="getTypeColor(item.type)">
+                      <Document v-if="item.type === 'ORDER'" />
+                      <Flag v-else-if="item.type === 'ACTIVITY'" />
+                      <InfoFilled v-else />
+                    </el-icon>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm font-medium truncate">{{ item.title }}</span>
+                      <span v-if="item.isRead === 0" class="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 ml-2"></span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1 truncate">{{ item.content }}</p>
+                    <p class="text-xs text-gray-400 mt-1">{{ formatTime(item.createTime) }}</p>
+                  </div>
+                </div>
+              </div>
+              <div class="text-center mt-3 pt-3 border-t">
+                <el-button link type="primary" @click="$router.push('/notifications')">查看全部消息</el-button>
+              </div>
+            </div>
+          </el-popover>
+
           <el-badge :value="cartStore.totalCount" :hidden="cartStore.totalCount === 0">
             <el-button link @click="$router.push('/cart')">
               <el-icon size="20"><ShoppingCart /></el-icon>
@@ -28,6 +80,7 @@
                 <el-dropdown-item @click="$router.push('/orders')">我的订单</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/coupons')">领券中心</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/my-coupons')">我的优惠券</el-dropdown-item>
+                <el-dropdown-item @click="$router.push('/notifications')">消息中心</el-dropdown-item>
                 <el-dropdown-item v-if="userStore.user?.role === 'ADMIN'" @click="$router.push('/coupon-admin')">优惠券管理</el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
@@ -63,11 +116,14 @@
 <script setup>
 import { useUserStore } from '@/store/user'
 import { useCartStore } from '@/store/cart'
+import { useNotificationStore } from '@/store/notification'
 import { useRouter } from 'vue-router'
 import { onMounted } from 'vue'
+import { markAllNotificationsRead } from '@/api'
 
 const userStore = useUserStore()
 const cartStore = useCartStore()
+const notificationStore = useNotificationStore()
 const router = useRouter()
 
 const handleLogout = () => {
@@ -75,7 +131,52 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+const handleNotificationPopoverShow = () => {
+  notificationStore.fetchRecentList()
+}
+
+const handleNotificationClick = (item) => {
+  if (item.isRead === 0) {
+    notificationStore.markReadAndRefresh(item.id)
+  }
+  if (item.type === 'ORDER' && item.businessId) {
+    router.push(`/order/${item.businessId}`)
+  }
+}
+
+const markAllRead = async () => {
+  try {
+    await markAllNotificationsRead()
+    notificationStore.resetUnread()
+    notificationStore.fetchRecentList()
+  } catch (e) {
+    console.error('标记全部已读失败', e)
+  }
+}
+
+const getTypeColor = (type) => {
+  switch (type) {
+    case 'ORDER': return '#409EFF'
+    case 'ACTIVITY': return '#E6A23C'
+    case 'SYSTEM': return '#909399'
+    default: return '#909399'
+  }
+}
+
+const formatTime = (time) => {
+  if (!time) return ''
+  const date = new Date(time)
+  const now = new Date()
+  const diff = now - date
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
+  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
+  if (diff < 604800000) return Math.floor(diff / 86400000) + '天前'
+  return date.toLocaleDateString()
+}
+
 onMounted(() => {
   cartStore.fetchCart()
+  notificationStore.fetchUnreadCount()
 })
 </script>

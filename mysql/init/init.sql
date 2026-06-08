@@ -194,3 +194,17 @@ CREATE TABLE `order_cancel_logs` (
     FOREIGN KEY (order_id) REFERENCES orders(id),
     UNIQUE KEY `uk_order_id` (`order_id`)
 ) ENGINE=InnoDB COMMENT='订单取消日志表';
+
+-- 14. 站内通知表
+CREATE TABLE `notifications` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '接收用户ID',
+    `title` VARCHAR(200) NOT NULL COMMENT '通知标题',
+    `content` VARCHAR(1000) NOT NULL COMMENT '通知内容',
+    `type` VARCHAR(20) NOT NULL DEFAULT 'SYSTEM' COMMENT '类型: ORDER-订单, ACTIVITY-活动, SYSTEM-系统',
+    `is_read` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已读: 0-未读, 1-已读',
+    `business_id` BIGINT COMMENT '关联业务ID(如订单ID)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_user_read` (`user_id`, `is_read`)
+) ENGINE=InnoDB COMMENT='站内通知表';

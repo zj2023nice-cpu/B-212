@@ -10,6 +10,7 @@ import com.milktea.service.UserService;
 import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
 import com.milktea.service.AddressService;
+import com.milktea.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,9 @@ public class OrderController {
 
     @Autowired
     private OrderCancelLogMapper orderCancelLogMapper;
+
+    @Autowired
+    private NotificationService notificationService;
 
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -198,6 +202,15 @@ public class OrderController {
         logger.info("订单创建成功(待支付): orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}, memberDiscount={}", 
                 order.getId(), userId, totalAmount, couponRedeemed ? discountAmount : BigDecimal.ZERO, 
                 couponRedeemed ? payAmount : totalAmount, couponRedeemed, memberDiscountAmount);
+
+        try {
+            notificationService.sendNotification(userId, "订单创建成功",
+                    "您的订单 " + order.getOrderSn() + " 已创建成功，待支付金额 ¥" + order.getPayAmount(),
+                    "ORDER", order.getId());
+        } catch (Exception e) {
+            logger.warn("发送订单创建通知失败: orderId={}, reason={}", order.getId(), e.getMessage());
+        }
+
         return Result.success(order);
     }
 
@@ -305,6 +318,13 @@ public class OrderController {
                 logger.warn("支付后积分发放失败，不影响订单: orderId={}, reason={}", id, e.getMessage());
             }
             logger.info("订单已支付: orderId={}, userId={}", id, existingOrder.getUserId());
+            try {
+                notificationService.sendNotification(existingOrder.getUserId(), "订单已支付",
+                        "您的订单 " + existingOrder.getOrderSn() + " 已支付成功，正在制作中",
+                        "ORDER", id);
+            } catch (Exception e) {
+                logger.warn("发送订单支付通知失败: orderId={}, reason={}", id, e.getMessage());
+            }
         }
 
         if (status == 3 && currentStatus != 3) {
@@ -330,6 +350,14 @@ public class OrderController {
                 cancelLog.setOperator("USER");
                 orderCancelLogMapper.insert(cancelLog);
 
+                try {
+                    notificationService.sendNotification(existingOrder.getUserId(), "订单已取消",
+                            "您的订单 " + existingOrder.getOrderSn() + " 已取消",
+                            "ORDER", id);
+                } catch (Exception e2) {
+                    logger.warn("发送订单取消通知失败: orderId={}, reason={}", id, e2.getMessage());
+                }
+
                 logger.info("订单已取消，所有商品库存已恢复: orderId={}, cancelReason={}", id, cancelReason);
                 return Result.success("Status updated");
             } catch (Exception e) {
@@ -342,7 +370,29 @@ public class OrderController {
         order.setId(id);
         order.setStatus(status);
         orderMapper.updateById(order);
+
+        try {
+            String statusText = getOrderStatusText(status);
+            notificationService.sendNotification(existingOrder.getUserId(), "订单状态变更",
+                    "您的订单 " + existingOrder.getOrderSn() + " 状态已更新为：" + statusText,
+                    "ORDER", id);
+        } catch (Exception e) {
+            logger.warn("发送订单状态变更通知失败: orderId={}, reason={}", id, e.getMessage());
+        }
+
         return Result.success("Status updated");
+    }
+
+    private String getOrderStatusText(Integer status) {
+        switch (status) {
+            case 0: return "待支付";
+            case 1: return "制作中";
+            case 2: return "配送中";
+            case 3: return "已取消";
+            case 4: return "已送达";
+            case 5: return "已评价";
+            default: return "未知状态";
+        }
     }
 
     private void restoreOrderStock(Long orderId) {

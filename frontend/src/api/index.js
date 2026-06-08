@@ -46,3 +46,11 @@ export const setDefaultAddress = (id) => request.put(`/addresses/${id}/default`)
 
 export const getHotRanking = (params) => request.get('/ranking/hot', { params })
 export const getRecommendation = (params) => request.get('/ranking/recommend', { params })
+
+export const getNotifications = (params) => request.get('/notifications', { params })
+export const getRecentNotifications = (limit = 5) => request.get('/notifications/recent', { params: { limit } })
+export const getUnreadCount = () => request.get('/notifications/unread-count')
+export const markNotificationRead = (id) => request.put(`/notifications/${id}/read`)
+export const markAllNotificationsRead = () => request.put('/notifications/read-all')
+export const batchMarkNotificationsRead = (ids) => request.put('/notifications/batch-read', ids)
+export const deleteNotification = (id) => request.delete(`/notifications/${id}`)

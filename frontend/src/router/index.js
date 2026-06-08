@@ -59,6 +59,11 @@ const routes = [
         path: 'coupon-admin',
         name: 'CouponAdmin',
         component: () => import('../views/CouponAdmin.vue')
+      },
+      {
+        path: 'notifications',
+        name: 'NotificationCenter',
+        component: () => import('../views/NotificationCenter.vue')
       }
     ]
   }
