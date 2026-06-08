@@ -1,0 +1,1 @@
+ALTER TABLE feedbacks ADD COLUMN admin_reply VARCHAR(500) DEFAULT NULL;

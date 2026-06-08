@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -90,6 +91,8 @@ public class FeedbackController {
                 vo.setImages(Collections.emptyList());
             }
 
+            vo.setAdminReply(fb.getAdminReply());
+
             User user = userMap.get(fb.getUserId());
             if (user != null) {
                 vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
@@ -158,6 +161,7 @@ public class FeedbackController {
     public Result<List<FeedbackVO>> getProductFeedbacks(
             @PathVariable Long productId,
             @RequestParam(required = false) Integer rating,
+            @RequestParam(required = false) Boolean hasImage,
             @RequestParam(defaultValue = "desc") String sortOrder) {
 
         LambdaQueryWrapper<Feedback> query = new LambdaQueryWrapper<Feedback>()
@@ -165,6 +169,10 @@ public class FeedbackController {
 
         if (rating != null) {
             query.eq(Feedback::getRating, rating);
+        }
+
+        if (hasImage != null && hasImage) {
+            query.isNotNull(Feedback::getImages).ne(Feedback::getImages, "");
         }
 
         if ("asc".equalsIgnoreCase(sortOrder)) {
@@ -231,5 +239,25 @@ public class FeedbackController {
             logger.error("图片上传失败: {}", e.getMessage());
             return Result.error("图片上传失败");
         }
+    }
+
+    @PostMapping("/{id}/reply")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<String> replyFeedback(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String reply = body.get("reply");
+        if (reply == null || reply.trim().isEmpty()) {
+            return Result.error("回复内容不能为空");
+        }
+
+        Feedback feedback = feedbackMapper.selectById(id);
+        if (feedback == null) {
+            return Result.error("评价不存在");
+        }
+
+        feedback.setAdminReply(reply.trim());
+        feedbackMapper.updateById(feedback);
+
+        logger.info("管理员回复评价: feedbackId={}", id);
+        return Result.success("回复成功");
     }
 }

@@ -107,7 +107,7 @@ const props = defineProps({
 
 const maxLength = 500
 const minLength = 5
-const maxImages = 6
+const maxImages = 3
 
 const rateColors = ['#99A9BF', '#F7BA2A', '#FF9900']
 const rateTexts = ['很差', '一般', '还行', '很好', '非常好']

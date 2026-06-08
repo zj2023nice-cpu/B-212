@@ -22,10 +22,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -281,7 +278,7 @@ class FeedbackControllerTest {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
         when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
 
-        var result = feedbackController.getProductFeedbacks(1L, null, "desc");
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
 
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
@@ -296,7 +293,7 @@ class FeedbackControllerTest {
     void testGetProductFeedbacks_Empty() {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(new ArrayList<>());
 
-        var result = feedbackController.getProductFeedbacks(999L, null, "desc");
+        var result = feedbackController.getProductFeedbacks(999L, null, null, "desc");
 
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
@@ -314,7 +311,7 @@ class FeedbackControllerTest {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
         when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
 
-        var result = feedbackController.getProductFeedbacks(1L, 5, "desc");
+        var result = feedbackController.getProductFeedbacks(1L, 5, null, "desc");
 
         assertTrue(result.isSuccess());
         assertEquals(1, result.getData().size());
@@ -408,7 +405,7 @@ class FeedbackControllerTest {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
         when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
 
-        feedbackController.getProductFeedbacks(1L, null, "desc");
+        feedbackController.getProductFeedbacks(1L, null, null, "desc");
 
         verify(userService, times(1)).listByIds(any(Collection.class));
         verify(userService, never()).getById(anyLong());
@@ -420,10 +417,99 @@ class FeedbackControllerTest {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
         when(userService.listByIds(any(Collection.class))).thenReturn(new ArrayList<>());
 
-        var result = feedbackController.getProductFeedbacks(1L, null, "desc");
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
 
         assertTrue(result.isSuccess());
         assertEquals(1, result.getData().size());
         assertEquals("匿名用户", result.getData().get(0).getNickname());
+    }
+
+    @Test
+    @DisplayName("测试 replyFeedback - 管理员回复成功")
+    void testReplyFeedback_Success() {
+        testFeedback.setId(1L);
+        when(feedbackMapper.selectById(1L)).thenReturn(testFeedback);
+        when(feedbackMapper.updateById(any(Feedback.class))).thenReturn(1);
+
+        Map<String, String> body = new HashMap<>();
+        body.put("reply", "感谢您的评价！");
+        var result = feedbackController.replyFeedback(1L, body);
+
+        assertTrue(result.isSuccess());
+        assertEquals("回复成功", result.getMessage());
+        verify(feedbackMapper).updateById(argThat(fb ->
+            fb.getAdminReply() != null && fb.getAdminReply().equals("感谢您的评价！")
+        ));
+    }
+
+    @Test
+    @DisplayName("测试 replyFeedback - 评价不存在")
+    void testReplyFeedback_FeedbackNotFound() {
+        when(feedbackMapper.selectById(999L)).thenReturn(null);
+
+        Map<String, String> body = new HashMap<>();
+        body.put("reply", "回复内容");
+        var result = feedbackController.replyFeedback(999L, body);
+
+        assertFalse(result.isSuccess());
+        assertEquals("评价不存在", result.getMessage());
+        verify(feedbackMapper, never()).updateById(any(Feedback.class));
+    }
+
+    @Test
+    @DisplayName("测试 replyFeedback - 回复内容为空")
+    void testReplyFeedback_EmptyReply() {
+        Map<String, String> body = new HashMap<>();
+        body.put("reply", "");
+        var result = feedbackController.replyFeedback(1L, body);
+
+        assertFalse(result.isSuccess());
+        assertEquals("回复内容不能为空", result.getMessage());
+        verify(feedbackMapper, never()).updateById(any(Feedback.class));
+    }
+
+    @Test
+    @DisplayName("测试 replyFeedback - 回复内容为null")
+    void testReplyFeedback_NullReply() {
+        Map<String, String> body = new HashMap<>();
+        var result = feedbackController.replyFeedback(1L, body);
+
+        assertFalse(result.isSuccess());
+        assertEquals("回复内容不能为空", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 按有图筛选")
+    void testGetProductFeedbacks_FilterByHasImage() {
+        testFeedback.setImages("/uploads/img1.jpg,/uploads/img2.jpg");
+        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
+        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, true, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertFalse(result.getData().get(0).getImages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("测试 convertToVOList - 包含adminReply")
+    void testConvertToVOList_WithAdminReply() {
+        testFeedback.setAdminReply("感谢您的评价！");
+        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
+        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals("感谢您的评价！", result.getData().get(0).getAdminReply());
     }
 }

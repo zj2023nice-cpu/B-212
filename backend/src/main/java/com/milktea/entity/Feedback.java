@@ -17,5 +17,6 @@ public class Feedback {
     private Integer rating;
     private String content;
     private String images;
+    private String adminReply;
     private LocalDateTime createTime;
 }

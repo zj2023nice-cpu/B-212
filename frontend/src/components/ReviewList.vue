@@ -2,7 +2,7 @@
   <div>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
       <h3 class="text-lg font-bold text-gray-800">用户评价</h3>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
         <el-select
           v-model="filterRating"
           placeholder="评分筛选"
@@ -18,6 +18,7 @@
           <el-option label="2星" :value="2" />
           <el-option label="1星差评" :value="1" />
         </el-select>
+        <el-checkbox v-model="filterHasImage" label="有图" size="small" @change="handleFilterChange" />
         <el-radio-group v-model="sortOrder" size="small" @change="handleFilterChange">
           <el-radio-button value="desc">最新优先</el-radio-button>
           <el-radio-button value="asc">最早优先</el-radio-button>
@@ -57,8 +58,34 @@
                 <img :src="img" class="w-full h-full object-cover" />
               </div>
             </div>
+            <div v-if="review.adminReply" class="bg-blue-50 rounded-lg p-3 mb-2">
+              <div class="flex items-center gap-1 mb-1">
+                <el-icon class="text-blue-500" size="14"><ChatDotRound /></el-icon>
+                <span class="text-xs font-medium text-blue-600">商家回复</span>
+              </div>
+              <p class="text-sm text-blue-800">{{ review.adminReply }}</p>
+            </div>
             <div class="text-xs text-gray-400">
               {{ formatDate(review.createTime) }}
+            </div>
+            <div v-if="isAdmin && !review.adminReply" class="mt-2">
+              <div class="flex items-center gap-2">
+                <el-input
+                  v-model="replyMap[review.id]"
+                  size="small"
+                  placeholder="回复该评价..."
+                  class="flex-grow"
+                  @keyup.enter="handleReply(review.id)"
+                />
+                <el-button
+                  type="primary"
+                  size="small"
+                  :loading="replyLoadingMap[review.id]"
+                  @click="handleReply(review.id)"
+                >
+                  回复
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -84,9 +111,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { getProductFeedbacks } from '@/api'
-import { Loading } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
+import { getProductFeedbacks, replyFeedback } from '@/api'
+import { Loading, ChatDotRound } from '@element-plus/icons-vue'
+import { useUserStore } from '@/store/user'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   productId: {
@@ -95,10 +124,16 @@ const props = defineProps({
   }
 })
 
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.user?.role === 'ADMIN')
+
 const reviews = ref([])
 const loading = ref(false)
 const filterRating = ref(null)
+const filterHasImage = ref(false)
 const sortOrder = ref('desc')
+const replyMap = reactive({})
+const replyLoadingMap = reactive({})
 
 const showViewer = ref(false)
 const viewerList = ref([])
@@ -123,6 +158,9 @@ const fetchReviews = async () => {
     if (filterRating.value !== null) {
       params.rating = filterRating.value
     }
+    if (filterHasImage.value) {
+      params.hasImage = true
+    }
     const data = await getProductFeedbacks(props.productId, params)
     reviews.value = data
   } catch (e) {
@@ -134,6 +172,28 @@ const fetchReviews = async () => {
 
 const handleFilterChange = () => {
   fetchReviews()
+}
+
+const handleReply = async (reviewId) => {
+  const reply = replyMap[reviewId]
+  if (!reply || !reply.trim()) {
+    ElMessage.warning('请输入回复内容')
+    return
+  }
+  replyLoadingMap[reviewId] = true
+  try {
+    await replyFeedback(reviewId, reply.trim())
+    ElMessage.success('回复成功')
+    delete replyMap[reviewId]
+    const review = reviews.value.find(r => r.id === reviewId)
+    if (review) {
+      review.adminReply = reply.trim()
+    }
+  } catch (e) {
+    ElMessage.error('回复失败：' + (e.response?.data?.message || e.message))
+  } finally {
+    delete replyLoadingMap[reviewId]
+  }
 }
 
 watch(() => props.productId, () => {

@@ -25,6 +25,7 @@ export const submitFeedback = (data) => request.post('/feedbacks', data)
 export const getProductFeedbacks = (productId, params) => request.get(`/feedbacks/product/${productId}`, { params })
 export const getOrderFeedbacks = (orderId) => request.get(`/feedbacks/order/${orderId}`)
 export const uploadFeedbackImage = (formData) => request.post('/feedbacks/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const replyFeedback = (id, reply) => request.post(`/feedbacks/${id}/reply`, { reply })
 
 export const getCoupons = (params) => request.get('/coupons', { params })
 export const createCoupon = (data) => request.post('/coupons', data)

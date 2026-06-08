@@ -13,6 +13,7 @@ public class FeedbackVO {
     private Integer rating;
     private String content;
     private List<String> images;
+    private String adminReply;
     private LocalDateTime createTime;
     private String nickname;
     private String avatarUrl;
