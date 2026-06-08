@@ -77,6 +77,15 @@ export const ResultCode = {
   EMAIL_SEND_FAILED: 10003,
   PAYMENT_FAILED: 10004,
   PAYMENT_TIMEOUT: 10005,
+
+  COUPON_NOT_FOUND: 11001,
+  COUPON_ALREADY_CLAIMED: 11002,
+  COUPON_STOCK_EXHAUSTED: 11003,
+  COUPON_EXPIRED: 11004,
+  COUPON_NOT_AVAILABLE: 11005,
+  COUPON_THRESHOLD_NOT_MET: 11006,
+  COUPON_ALREADY_USED: 11007,
+  COUPON_INVALID: 11008,
 }
 
 export const ResultCodeMessages = {
@@ -158,6 +167,15 @@ export const ResultCodeMessages = {
   [ResultCode.EMAIL_SEND_FAILED]: '邮件发送失败',
   [ResultCode.PAYMENT_FAILED]: '支付失败',
   [ResultCode.PAYMENT_TIMEOUT]: '支付超时',
+
+  [ResultCode.COUPON_NOT_FOUND]: '优惠券不存在',
+  [ResultCode.COUPON_ALREADY_CLAIMED]: '优惠券已领取',
+  [ResultCode.COUPON_STOCK_EXHAUSTED]: '优惠券已领完',
+  [ResultCode.COUPON_EXPIRED]: '优惠券已过期',
+  [ResultCode.COUPON_NOT_AVAILABLE]: '优惠券不可用',
+  [ResultCode.COUPON_THRESHOLD_NOT_MET]: '未满足优惠券使用门槛',
+  [ResultCode.COUPON_ALREADY_USED]: '优惠券已使用',
+  [ResultCode.COUPON_INVALID]: '优惠券无效',
 }
 
 export function getMessage(code) {

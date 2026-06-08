@@ -25,6 +25,9 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click="$router.push('/orders')">我的订单</el-dropdown-item>
+                <el-dropdown-item @click="$router.push('/coupons')">领券中心</el-dropdown-item>
+                <el-dropdown-item @click="$router.push('/my-coupons')">我的优惠券</el-dropdown-item>
+                <el-dropdown-item v-if="userStore.user?.role === 'ADMIN'" @click="$router.push('/coupon-admin')">优惠券管理</el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -42,6 +45,9 @@
     <footer class="md:hidden bg-white border-t h-16 flex items-center justify-around">
       <el-button link @click="$router.push('/')" :class="{'text-primary': $route.path === '/'}">
         <el-icon size="24"><HomeFilled /></el-icon>
+      </el-button>
+      <el-button link @click="$router.push('/coupons')" :class="{'text-primary': $route.path === '/coupons'}">
+        <el-icon size="24"><Ticket /></el-icon>
       </el-button>
       <el-button link @click="$router.push('/cart')" :class="{'text-primary': $route.path === '/cart'}">
         <el-icon size="24"><ShoppingCartFull /></el-icon>

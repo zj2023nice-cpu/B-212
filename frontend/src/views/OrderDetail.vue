@@ -43,11 +43,19 @@
             </div>
           </div>
         </div>
-        <div class="mt-6 pt-6 border-t flex justify-between items-center">
-          <span class="text-gray-500">实付总计</span>
-          <span class="text-2xl font-bold text-primary"
-            >¥{{ order?.totalAmount }}</span
-          >
+        <div class="mt-6 pt-6 border-t">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-gray-500">商品总额</span>
+            <span>¥{{ order?.totalAmount }}</span>
+          </div>
+          <div v-if="order?.discountAmount > 0" class="flex justify-between items-center mb-2">
+            <span class="text-gray-500">优惠券减免</span>
+            <span class="text-red-500">-¥{{ order.discountAmount }}</span>
+          </div>
+          <div class="flex justify-between items-center mt-4 pt-4 border-t">
+            <span class="text-gray-500 font-bold">实付总计</span>
+            <span class="text-2xl font-bold text-primary">¥{{ order?.payAmount || order?.totalAmount }}</span>
+          </div>
         </div>
       </div>
 

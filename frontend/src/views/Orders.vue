@@ -21,9 +21,8 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
             <span class="text-gray-600">总计：</span>
-            <span class="text-xl font-bold text-primary"
-              >¥{{ order.totalAmount }}</span
-            >
+            <span class="text-xl font-bold text-primary">¥{{ order.payAmount || order.totalAmount }}</span>
+            <span v-if="order.discountAmount > 0" class="text-xs text-red-500 line-through">¥{{ order.totalAmount }}</span>
           </div>
           <div class="text-xs text-gray-400">
             {{ formatDate(order.createTime) }}

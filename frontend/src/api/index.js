@@ -20,3 +20,11 @@ export const getOrderItems = (id) => request.get(`/orders/${id}/items`)
 export const updateOrderStatus = (id, status) => request.put(`/orders/${id}/status`, null, { params: { status } })
 
 export const submitFeedback = (data) => request.post('/feedbacks', data)
+
+export const getCoupons = (params) => request.get('/coupons', { params })
+export const createCoupon = (data) => request.post('/coupons', data)
+export const updateCouponStatus = (id, status) => request.put(`/coupons/${id}/status`, null, { params: { status } })
+export const claimCoupon = (id) => request.post(`/coupons/${id}/claim`)
+export const getMyCoupons = (params) => request.get('/coupons/mine', { params })
+export const getAvailableCoupons = (params) => request.get('/coupons/available', { params })
+export const applyCoupon = (data) => request.post('/coupons/apply', data)

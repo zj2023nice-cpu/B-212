@@ -7,6 +7,7 @@ import com.milktea.entity.*;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
+import com.milktea.service.CouponService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +45,9 @@ public class OrderController {
 
     @Autowired
     private ProductService productService;
+
+    @Autowired
+    private CouponService couponService;
 
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -98,13 +102,46 @@ public class OrderController {
             }
         }
 
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Long userCouponId = orderReq.getUserCouponId();
+
+        if (userCouponId != null) {
+            try {
+                discountAmount = couponService.calculateDiscount(userCouponId, totalAmount);
+                if (discountAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                    userCouponId = null;
+                }
+            } catch (Exception e) {
+                logger.warn("优惠券计算失败，将不使用优惠券: {}", e.getMessage());
+                userCouponId = null;
+                discountAmount = BigDecimal.ZERO;
+            }
+        }
+
+        BigDecimal payAmount = totalAmount.subtract(discountAmount);
+
         Order order = new Order();
         order.setOrderSn(UUID.randomUUID().toString().replace("-", ""));
         order.setUserId(userId);
         order.setTotalAmount(totalAmount);
+        order.setDiscountAmount(discountAmount);
+        order.setPayAmount(payAmount);
+        order.setUserCouponId(userCouponId);
         order.setStatus(1);
         order.setRemark(orderReq.getRemark());
         orderMapper.insert(order);
+
+        if (userCouponId != null) {
+            try {
+                couponService.useCoupon(userCouponId, userId, order.getId());
+            } catch (Exception e) {
+                logger.warn("优惠券核销失败，回退优惠券信息: userCouponId={}, orderId={}", userCouponId, order.getId());
+                order.setDiscountAmount(BigDecimal.ZERO);
+                order.setPayAmount(totalAmount);
+                order.setUserCouponId(null);
+                orderMapper.updateById(order);
+            }
+        }
 
         for (CartItem item : cartItems) {
             Product product = productMapper.selectById(item.getProductId());
@@ -123,7 +160,8 @@ public class OrderController {
             cartItemMapper.deleteById(item.getId());
         }
 
-        logger.info("订单创建成功: orderId={}, userId={}", order.getId(), userId);
+        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}", 
+                order.getId(), userId, totalAmount, discountAmount, payAmount);
         return Result.success(order);
     }
 

@@ -34,6 +34,21 @@ const routes = [
         path: 'order/:id',
         name: 'OrderDetail',
         component: () => import('../views/OrderDetail.vue')
+      },
+      {
+        path: 'coupons',
+        name: 'Coupons',
+        component: () => import('../views/Coupons.vue')
+      },
+      {
+        path: 'my-coupons',
+        name: 'MyCoupons',
+        component: () => import('../views/MyCoupons.vue')
+      },
+      {
+        path: 'coupon-admin',
+        name: 'CouponAdmin',
+        component: () => import('../views/CouponAdmin.vue')
       }
     ]
   }

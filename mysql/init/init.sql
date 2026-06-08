@@ -58,6 +58,9 @@ CREATE TABLE `orders` (
     `order_sn` VARCHAR(64) NOT NULL UNIQUE COMMENT '订单编号',
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
     `total_amount` DECIMAL(10, 2) NOT NULL COMMENT '总金额',
+    `discount_amount` DECIMAL(10, 2) DEFAULT 0.00 COMMENT '优惠金额',
+    `pay_amount` DECIMAL(10, 2) NOT NULL COMMENT '实付金额',
+    `user_coupon_id` BIGINT COMMENT '使用的优惠券ID',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0-待支付, 1-制作中, 2-配送中, 4-已送达, 5-已评价',
     `remark` VARCHAR(255) COMMENT '备注',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -102,3 +105,33 @@ INSERT INTO `products` (category_id, name, description, price, image) VALUES
 (2, '波波烤奶', '焦香奶盖，口感丰富', 15.00, '/images/boba.png'),
 (3, '满杯红柚', '新鲜红柚，酸甜清爽', 19.00, '/images/grapefruit.png'),
 (4, '芝芝莓莓', '新鲜莓果，搭配浓郁咸香奶盖', 25.00, '/images/strawberry_cheese.png');
+
+-- 8. 优惠券表
+CREATE TABLE `coupons` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `code` VARCHAR(8) NOT NULL UNIQUE COMMENT '优惠券码',
+    `type` TINYINT NOT NULL COMMENT '类型: 1-满减, 2-折扣',
+    `threshold` DECIMAL(10, 2) DEFAULT 0.00 COMMENT '门槛金额',
+    `value` DECIMAL(10, 2) NOT NULL COMMENT '优惠值(满减为金额, 折扣为比率如0.8表示8折)',
+    `start_time` DATETIME NOT NULL COMMENT '有效期开始',
+    `end_time` DATETIME NOT NULL COMMENT '有效期结束',
+    `total_count` INT NOT NULL DEFAULT 0 COMMENT '总发行量',
+    `used_count` INT NOT NULL DEFAULT 0 COMMENT '已使用量(含已领取)',
+    `status` TINYINT DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB COMMENT='优惠券表';
+
+-- 9. 用户优惠券表
+CREATE TABLE `user_coupons` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `coupon_id` BIGINT NOT NULL COMMENT '优惠券ID',
+    `status` TINYINT DEFAULT 0 COMMENT '状态: 0-未使用, 1-已使用',
+    `order_id` BIGINT COMMENT '使用的订单ID',
+    `use_time` DATETIME COMMENT '使用时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (coupon_id) REFERENCES coupons(id),
+    UNIQUE KEY `uk_user_coupon` (`user_id`, `coupon_id`)
+) ENGINE=InnoDB COMMENT='用户优惠券表';

@@ -18,7 +18,6 @@
         </div>
       </div>
 
-      <!-- Settlement -->
       <div class="glass-card p-6 mt-8 flex items-center justify-between">
         <div>
           <span class="text-gray-500">共 {{ cartStore.totalCount }} 件商品</span>
@@ -34,16 +33,46 @@
       </el-empty>
     </div>
 
-    <!-- Checkout Dialog -->
-    <el-dialog v-model="checkoutVisible" title="确认订单" width="450px">
+    <el-dialog v-model="checkoutVisible" title="确认订单" width="500px">
       <el-form label-position="top">
+        <el-form-item label="选择优惠券">
+          <el-select
+            v-model="selectedCouponId"
+            placeholder="不使用优惠券"
+            clearable
+            style="width: 100%"
+            @change="handleCouponChange"
+          >
+            <el-option
+              v-for="uc in availableCoupons"
+              :key="uc.id"
+              :label="getCouponLabel(uc)"
+              :value="uc.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="discountAmount > 0" label="">
+          <div class="w-full flex items-center justify-between text-sm">
+            <span class="text-gray-500">商品总额</span>
+            <span>¥{{ totalPrice }}</span>
+          </div>
+          <div class="w-full flex items-center justify-between text-sm mt-2">
+            <span class="text-gray-500">优惠券减免</span>
+            <span class="text-red-500">-¥{{ discountAmount }}</span>
+          </div>
+          <el-divider class="my-3" />
+          <div class="w-full flex items-center justify-between">
+            <span class="font-bold">实付金额</span>
+            <span class="text-xl font-bold text-primary">¥{{ finalPrice }}</span>
+          </div>
+        </el-form-item>
         <el-form-item label="备注信息">
           <el-input v-model="remark" type="textarea" placeholder="口味要求等..." />
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="flex items-center justify-between">
-          <span class="text-lg font-bold text-primary">应付：¥{{ totalPrice }}</span>
+          <span class="text-lg font-bold text-primary">应付：¥{{ finalPrice }}</span>
           <el-button type="primary" @click="confirmOrder" :loading="submitting">确认付款</el-button>
         </div>
       </template>
@@ -54,7 +83,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useCartStore } from '@/store/cart'
-import { getProducts, updateCartItem, removeCartItem, createOrder } from '@/api'
+import { getProducts, updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon } from '@/api'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -64,6 +93,9 @@ const allProducts = ref([])
 const checkoutVisible = ref(false)
 const remark = ref('')
 const submitting = ref(false)
+const availableCoupons = ref([])
+const selectedCouponId = ref(null)
+const discountAmount = ref(0)
 
 const cartItemsWithProduct = computed(() => {
   return cartStore.items.map(item => ({
@@ -76,11 +108,24 @@ const totalPrice = computed(() => {
   return cartItemsWithProduct.value.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0).toFixed(2)
 })
 
+const finalPrice = computed(() => {
+  const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value)
+  return val.toFixed(2)
+})
+
 const formatSpecs = (specsStr) => {
   try {
     const s = JSON.parse(specsStr)
     return `${s.temp} / ${s.sugar}`
   } catch (e) { return specsStr }
+}
+
+const getCouponLabel = (uc) => {
+  const coupon = uc.coupon
+  if (!coupon) return '优惠券'
+  const typeStr = coupon.type === 1 ? `满减¥${coupon.value}` : `${(coupon.value * 10).toFixed(1)}折`
+  const thresholdStr = coupon.threshold > 0 ? `满¥${coupon.threshold}` : '无门槛'
+  return `[${typeStr}] ${thresholdStr} - ${coupon.code}`
 }
 
 const handleUpdateQuantity = async (id, val) => {
@@ -93,8 +138,48 @@ const handleRemove = async (id) => {
   await cartStore.fetchCart()
 }
 
-const handleCheckout = () => {
+const handleCheckout = async () => {
+  selectedCouponId.value = null
+  discountAmount.value = 0
   checkoutVisible.value = true
+  try {
+    const amount = parseFloat(totalPrice.value)
+    const data = await getAvailableCoupons({ orderAmount: amount })
+    availableCoupons.value = data.map(uc => ({
+      ...uc,
+      coupon: uc.coupon || null
+    }))
+    const couponIds = availableCoupons.value.map(uc => uc.couponId)
+    if (couponIds.length > 0) {
+      const { getCoupons } = await import('@/api')
+      const allData = await getCoupons({ page: 1, pageSize: 1000 })
+      const couponMap = {}
+      allData.records.forEach(c => { couponMap[c.id] = c })
+      availableCoupons.value = availableCoupons.value.map(uc => ({
+        ...uc,
+        coupon: couponMap[uc.couponId] || null
+      }))
+    }
+  } catch (e) {
+    availableCoupons.value = []
+  }
+}
+
+const handleCouponChange = async (val) => {
+  if (!val) {
+    discountAmount.value = 0
+    return
+  }
+  try {
+    const data = await applyCoupon({
+      userCouponId: val,
+      orderAmount: parseFloat(totalPrice.value)
+    })
+    discountAmount.value = parseFloat(data.discount) || 0
+  } catch (e) {
+    discountAmount.value = 0
+    selectedCouponId.value = null
+  }
 }
 
 const confirmOrder = async () => {
@@ -102,7 +187,8 @@ const confirmOrder = async () => {
   try {
     await createOrder({
       totalAmount: totalPrice.value,
-      remark: remark.value
+      remark: remark.value,
+      userCouponId: selectedCouponId.value || undefined
     })
     ElMessage.success('支付成功，订单已下达')
     await cartStore.fetchCart()

@@ -80,6 +80,15 @@ public enum ResultCode {
     DATA_INTEGRITY_ERROR(9003, "数据完整性约束失败"),
     OPTIMISTIC_LOCK_ERROR(9004, "乐观锁冲突，请重试"),
 
+    COUPON_NOT_FOUND(11001, "优惠券不存在"),
+    COUPON_ALREADY_CLAIMED(11002, "优惠券已领取"),
+    COUPON_STOCK_EXHAUSTED(11003, "优惠券已领完"),
+    COUPON_EXPIRED(11004, "优惠券已过期"),
+    COUPON_NOT_AVAILABLE(11005, "优惠券不可用"),
+    COUPON_THRESHOLD_NOT_MET(11006, "未满足优惠券使用门槛"),
+    COUPON_ALREADY_USED(11007, "优惠券已使用"),
+    COUPON_INVALID(11008, "优惠券无效"),
+
     THIRD_PARTY_ERROR(10001, "第三方服务调用失败"),
     SMS_SEND_FAILED(10002, "短信发送失败"),
     EMAIL_SEND_FAILED(10003, "邮件发送失败"),
