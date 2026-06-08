@@ -38,13 +38,25 @@
         </div>
       </div>
 
-      <div v-else-if="order?.addressFull" class="p-8 border-t">
+      <div v-if="order?.deliveryType !== 'SELF_PICKUP' && (order?.address || order?.addressFull)" class="p-8 border-t">
         <h4 class="font-bold mb-3">配送信息</h4>
-        <div class="flex items-center gap-4 text-sm">
+        <div class="flex items-center gap-4 text-sm mb-2">
           <span class="text-gray-600"><span class="font-medium text-gray-800">{{ order.addressContactName }}</span></span>
           <span class="text-gray-600">{{ order.addressPhone }}</span>
         </div>
-        <div class="text-sm text-gray-500 mt-1">{{ order.addressFull }}</div>
+        <div class="text-sm text-gray-500 mb-4">{{ order.address || order.addressFull }}</div>
+        <div class="rounded-xl overflow-hidden border bg-gray-50">
+          <img
+            :src="deliveryMapUrl"
+            alt="配送地址地图示意"
+            class="w-full h-40 object-cover"
+            @error="$event.target.style.display='none'"
+          />
+          <div class="flex items-center gap-2 px-4 py-2 bg-white">
+            <el-icon class="text-primary"><Location /></el-icon>
+            <span class="text-xs text-gray-500 truncate">{{ order.address || order.addressFull }}</span>
+          </div>
+        </div>
       </div>
 
       <div class="p-8 bg-gray-50 border-t">
@@ -169,11 +181,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOrderDetail, getOrderItems, updateOrderStatus, submitFeedback } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning, EditPen, CircleCheck, Shop, Clock } from '@element-plus/icons-vue'
+import { Warning, EditPen, CircleCheck, Shop, Clock, Location } from '@element-plus/icons-vue'
 import ReviewForm from '@/components/ReviewForm.vue'
 
 const route = useRoute()
@@ -249,6 +261,13 @@ const formatPickupTime = timeStr => {
   const d = new Date(timeStr)
   return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
+
+const deliveryMapUrl = computed(() => {
+  const addr = order.value?.address || order.value?.addressFull || ''
+  if (!addr) return ''
+  const prompt = encodeURIComponent(`a clean minimal map illustration showing a delivery route to an address in a city, ${addr}, simple flat design, light colors, no text, cartographic style`)
+  return `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}&image_size=landscape_4_3`
+})
 
 const fetchData = async () => {
   const id = route.params.id

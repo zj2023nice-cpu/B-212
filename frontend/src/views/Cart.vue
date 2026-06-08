@@ -321,6 +321,10 @@ const confirmOrder = async () => {
     }
     if (deliveryType.value === 'DELIVERY') {
       orderData.addressId = selectedAddress.value?.id || undefined
+      const addr = selectedAddress.value
+      if (addr) {
+        orderData.address = (addr.province || '') + (addr.city || '') + (addr.district || '') + (addr.detailAddress || '')
+      }
     } else {
       orderData.pickupStore = pickupStore.value
       const today = new Date()

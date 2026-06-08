@@ -184,7 +184,9 @@ public class OrderController {
                 order.setAddressId(address.getId());
                 order.setAddressContactName(address.getContactName());
                 order.setAddressPhone(address.getPhone());
-                order.setAddressFull(address.getProvince() + address.getCity() + address.getDistrict() + address.getDetailAddress());
+                String fullAddr = address.getProvince() + address.getCity() + address.getDistrict() + address.getDetailAddress();
+                order.setAddressFull(fullAddr);
+                order.setAddress(fullAddr);
             } catch (Exception e) {
                 logger.warn("地址信息获取失败: addressId={}, reason={}", orderReq.getAddressId(), e.getMessage());
                 return Result.error("收货地址信息获取失败，请重新选择");

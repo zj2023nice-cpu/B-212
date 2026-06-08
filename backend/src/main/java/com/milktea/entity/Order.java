@@ -27,6 +27,7 @@ public class Order {
     private String addressContactName;
     private String addressPhone;
     private String addressFull;
+    private String address;
     private DeliveryType deliveryType;
     private String pickupStore;
     private LocalDateTime pickupTime;

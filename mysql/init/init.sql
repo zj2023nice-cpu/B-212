@@ -73,6 +73,7 @@ CREATE TABLE `orders` (
     `address_contact_name` VARCHAR(50) COMMENT '收货联系人',
     `address_phone` VARCHAR(20) COMMENT '收货手机号',
     `address_full` VARCHAR(500) COMMENT '完整收货地址',
+    `address` VARCHAR(500) COMMENT '统一配送地址(外卖配送时为完整收货地址)',
     `delivery_type` VARCHAR(20) NOT NULL DEFAULT 'DELIVERY' COMMENT '配送方式: DELIVERY-外卖配送, SELF_PICKUP-门店自提',
     `pickup_store` VARCHAR(100) COMMENT '自提门店名称',
     `pickup_time` DATETIME COMMENT '预计自提时间',
