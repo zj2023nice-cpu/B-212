@@ -131,18 +131,6 @@ public class OrderController {
         order.setRemark(orderReq.getRemark());
         orderMapper.insert(order);
 
-        if (userCouponId != null) {
-            try {
-                couponService.useCoupon(userCouponId, userId, order.getId());
-            } catch (Exception e) {
-                logger.warn("优惠券核销失败，回退优惠券信息: userCouponId={}, orderId={}", userCouponId, order.getId());
-                order.setDiscountAmount(BigDecimal.ZERO);
-                order.setPayAmount(totalAmount);
-                order.setUserCouponId(null);
-                orderMapper.updateById(order);
-            }
-        }
-
         for (CartItem item : cartItems) {
             Product product = productMapper.selectById(item.getProductId());
             if (product == null) {
@@ -160,8 +148,26 @@ public class OrderController {
             cartItemMapper.deleteById(item.getId());
         }
 
-        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}", 
-                order.getId(), userId, totalAmount, discountAmount, payAmount);
+        boolean couponRedeemed = false;
+        if (userCouponId != null) {
+            try {
+                couponService.useCoupon(userCouponId, userId, order.getId());
+                couponRedeemed = true;
+            } catch (Exception e) {
+                logger.warn("优惠券核销失败，订单将按无优惠创建: userCouponId={}, orderId={}, reason={}", userCouponId, order.getId(), e.getMessage());
+            }
+        }
+
+        if (userCouponId != null && !couponRedeemed) {
+            order.setDiscountAmount(BigDecimal.ZERO);
+            order.setPayAmount(totalAmount);
+            order.setUserCouponId(null);
+            orderMapper.updateById(order);
+        }
+
+        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}", 
+                order.getId(), userId, totalAmount, couponRedeemed ? discountAmount : BigDecimal.ZERO, 
+                couponRedeemed ? payAmount : totalAmount, couponRedeemed);
         return Result.success(order);
     }
 
