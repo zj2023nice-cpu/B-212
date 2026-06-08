@@ -1,7 +1,10 @@
 package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.milktea.common.Result;
+import com.milktea.dto.FeedbackSubmitDTO;
 import com.milktea.dto.FeedbackVO;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
@@ -33,6 +36,8 @@ import java.util.stream.Collectors;
 public class FeedbackController {
 
     private static final Logger logger = LoggerFactory.getLogger(FeedbackController.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int MAX_IMAGES = 3;
 
     @Autowired
     private FeedbackMapper feedbackMapper;
@@ -70,6 +75,46 @@ public class FeedbackController {
         return users.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
     }
 
+    private List<String> cleanImages(List<String> images) {
+        if (images == null || images.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return images.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(image -> !image.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private String serializeImages(List<String> images) {
+        try {
+            return objectMapper.writeValueAsString(cleanImages(images));
+        } catch (Exception e) {
+            throw new RuntimeException("评价图片序列化失败", e);
+        }
+    }
+
+    private List<String> parseImages(String rawImages) {
+        if (rawImages == null || rawImages.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String trimmedImages = rawImages.trim();
+        try {
+            if (trimmedImages.startsWith("[")) {
+                List<String> parsedImages = objectMapper.readValue(trimmedImages, new TypeReference<List<String>>() {});
+                return cleanImages(parsedImages);
+            }
+        } catch (Exception e) {
+            logger.warn("解析评价图片JSON失败，回退到旧格式解析: {}", trimmedImages, e);
+        }
+
+        return Arrays.stream(trimmedImages.split(","))
+                .map(String::trim)
+                .filter(image -> !image.isEmpty())
+                .collect(Collectors.toList());
+    }
+
     private List<FeedbackVO> convertToVOList(List<Feedback> feedbacks, Map<Long, User> userMap) {
         return feedbacks.stream().map(fb -> {
             FeedbackVO vo = new FeedbackVO();
@@ -80,17 +125,7 @@ public class FeedbackController {
             vo.setRating(fb.getRating());
             vo.setContent(fb.getContent());
             vo.setCreateTime(fb.getCreateTime());
-
-            if (fb.getImages() != null && !fb.getImages().isEmpty()) {
-                try {
-                    vo.setImages(Arrays.asList(fb.getImages().split(",")));
-                } catch (Exception e) {
-                    vo.setImages(Collections.emptyList());
-                }
-            } else {
-                vo.setImages(Collections.emptyList());
-            }
-
+            vo.setImages(parseImages(fb.getImages()));
             vo.setAdminReply(fb.getAdminReply());
 
             User user = userMap.get(fb.getUserId());
@@ -107,13 +142,16 @@ public class FeedbackController {
 
     @PostMapping
     @Transactional
-    public Result<String> submitFeedbacks(@RequestBody List<Feedback> feedbacks) {
+    public Result<String> submitFeedbacks(@RequestBody List<FeedbackSubmitDTO> feedbacks) {
         if (feedbacks == null || feedbacks.isEmpty()) {
             return Result.error("评价列表不能为空");
         }
 
         Long userId = getCurrentUserId();
         Long orderId = feedbacks.get(0).getOrderId();
+        if (orderId == null) {
+            return Result.error("订单ID不能为空");
+        }
 
         Order existingOrder = orderMapper.selectById(orderId);
         if (existingOrder == null) {
@@ -136,15 +174,29 @@ public class FeedbackController {
             return Result.error("该订单已评价，不能重复评价");
         }
 
-        for (Feedback feedback : feedbacks) {
-            if (feedback.getRating() == null || feedback.getRating() < 1 || feedback.getRating() > 5) {
+        for (FeedbackSubmitDTO feedbackDTO : feedbacks) {
+            if (!orderId.equals(feedbackDTO.getOrderId())) {
+                return Result.error("评价列表中的订单ID不一致");
+            }
+            if (feedbackDTO.getRating() == null || feedbackDTO.getRating() < 1 || feedbackDTO.getRating() > 5) {
                 return Result.error("评分必须在1-5之间");
             }
-            if (feedback.getProductId() == null) {
+            if (feedbackDTO.getProductId() == null) {
                 return Result.error("商品ID不能为空");
             }
+
+            List<String> images = cleanImages(feedbackDTO.getImages());
+            if (images.size() > MAX_IMAGES) {
+                return Result.error("评价图片最多上传3张");
+            }
+
+            Feedback feedback = new Feedback();
             feedback.setOrderId(orderId);
             feedback.setUserId(userId);
+            feedback.setProductId(feedbackDTO.getProductId());
+            feedback.setRating(feedbackDTO.getRating());
+            feedback.setContent(feedbackDTO.getContent());
+            feedback.setImages(serializeImages(images));
             feedbackMapper.insert(feedback);
         }
 
@@ -172,7 +224,9 @@ public class FeedbackController {
         }
 
         if (hasImage != null && hasImage) {
-            query.isNotNull(Feedback::getImages).ne(Feedback::getImages, "");
+            query.isNotNull(Feedback::getImages)
+                    .ne(Feedback::getImages, "")
+                    .ne(Feedback::getImages, "[]");
         }
 
         if ("asc".equalsIgnoreCase(sortOrder)) {

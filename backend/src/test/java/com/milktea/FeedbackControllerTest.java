@@ -2,6 +2,7 @@ package com.milktea;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.milktea.controller.FeedbackController;
+import com.milktea.dto.FeedbackSubmitDTO;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
 import com.milktea.entity.User;
@@ -22,11 +23,25 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FeedbackController 测试")
@@ -90,15 +105,10 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 submitFeedbacks - 订单不存在")
     void testSubmitFeedbacks_OrderNotFound() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(999L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(999L, 1L, 5, "测试评价", List.of());
         when(orderMapper.selectById(999L)).thenReturn(null);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("Order not found", result.getMessage());
@@ -113,15 +123,10 @@ class FeedbackControllerTest {
         otherUserOrder.setUserId(999L);
         otherUserOrder.setStatus(OrderStatus.COMPLETED);
 
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(2L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(2L, 1L, 5, "测试评价", List.of());
         when(orderMapper.selectById(2L)).thenReturn(otherUserOrder);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("Not authorized to submit feedback for this order", result.getMessage());
@@ -129,24 +134,31 @@ class FeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("测试 submitFeedbacks - 提交评价成功")
+    @DisplayName("测试 submitFeedbacks - 提交评价成功并序列化图片数组")
     void testSubmitFeedbacks_Success() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("非常好喝！");
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(
+                1L,
+                1L,
+                5,
+                "非常好喝！",
+                Arrays.asList("/uploads/img1.jpg", " /uploads/img2.jpg ", "", null)
+        );
 
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertTrue(result.isSuccess());
         assertEquals("Feedback submitted", result.getMessage());
-        verify(feedbackMapper, times(1)).insert(any(Feedback.class));
+        verify(feedbackMapper).insert(argThat(saved ->
+                saved.getOrderId().equals(1L)
+                        && saved.getUserId().equals(1L)
+                        && saved.getProductId().equals(1L)
+                        && "[\"/uploads/img1.jpg\",\"/uploads/img2.jpg\"]".equals(saved.getImages())
+        ));
         verify(orderMapper, times(1)).updateById(any(Order.class));
     }
 
@@ -158,15 +170,10 @@ class FeedbackControllerTest {
         pendingOrder.setUserId(1L);
         pendingOrder.setStatus(OrderStatus.DELIVERING);
 
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 5, "测试评价", List.of());
         when(orderMapper.selectById(1L)).thenReturn(pendingOrder);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("Only completed orders can be reviewed", result.getMessage());
@@ -175,16 +182,11 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 submitFeedbacks - 重复评价")
     void testSubmitFeedbacks_DuplicateReview() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 5, "测试评价", List.of());
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("该订单已评价，不能重复评价", result.getMessage());
@@ -193,56 +195,37 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 submitFeedbacks - 验证订单状态更新为已评价")
     void testSubmitFeedbacks_OrderStatusUpdated() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("非常好喝！");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 5, "非常好喝！", List.of());
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
 
-        feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        feedbackController.submitFeedbacks(List.of(feedback));
 
-        verify(orderMapper).updateById(argThat(order ->
-            order.getStatus() == OrderStatus.REVIEWED
-        ));
+        verify(orderMapper).updateById(argThat(order -> order.getStatus() == OrderStatus.REVIEWED));
     }
 
     @Test
     @DisplayName("测试 submitFeedbacks - 验证userId设置")
     void testSubmitFeedbacks_UserIdSet() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("非常好喝！");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 5, "非常好喝！", List.of());
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
 
-        feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        feedbackController.submitFeedbacks(List.of(feedback));
 
-        verify(feedbackMapper).insert(argThat(fb ->
-            fb.getUserId() != null && fb.getUserId().equals(1L)
-        ));
+        verify(feedbackMapper).insert(argThat(saved -> saved.getUserId() != null && saved.getUserId().equals(1L)));
     }
 
     @Test
     @DisplayName("测试 submitFeedbacks - 评分超出范围")
     void testSubmitFeedbacks_RatingOutOfRange() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(0);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 0, "测试评价", List.of());
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("评分必须在1-5之间", result.getMessage());
@@ -251,71 +234,60 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 submitFeedbacks - 商品ID为空")
     void testSubmitFeedbacks_ProductIdNull() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, null, 5, "测试评价", List.of());
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertFalse(result.isSuccess());
         assertEquals("商品ID不能为空", result.getMessage());
     }
 
     @Test
-    @DisplayName("测试 getProductFeedbacks - 获取商品评价列表")
-    void testGetProductFeedbacks() {
-        com.milktea.entity.User user1 = new com.milktea.entity.User();
-        user1.setId(1L);
-        user1.setNickname("用户1");
-        com.milktea.entity.User user2 = new com.milktea.entity.User();
-        user2.setId(2L);
-        user2.setNickname("用户2");
+    @DisplayName("测试 submitFeedbacks - 订单ID为空")
+    void testSubmitFeedbacks_OrderIdNull() {
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(null, 1L, 5, "测试评价", List.of());
 
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
-        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
-        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
-
-        assertTrue(result.isSuccess());
-        assertNotNull(result.getData());
-        assertEquals(2, result.getData().size());
-        assertEquals("用户1", result.getData().get(0).getNickname());
-        assertEquals("用户2", result.getData().get(1).getNickname());
-        verify(userService, times(1)).listByIds(any(Collection.class));
+        assertFalse(result.isSuccess());
+        assertEquals("订单ID不能为空", result.getMessage());
     }
 
     @Test
-    @DisplayName("测试 getProductFeedbacks - 无评价")
-    void testGetProductFeedbacks_Empty() {
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(new ArrayList<>());
+    @DisplayName("测试 submitFeedbacks - 订单ID不一致")
+    void testSubmitFeedbacks_OrderIdMismatch() {
+        FeedbackSubmitDTO feedback1 = buildFeedbackDTO(1L, 1L, 5, "测试评价1", List.of());
+        FeedbackSubmitDTO feedback2 = buildFeedbackDTO(2L, 2L, 4, "测试评价2", List.of());
+        when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        var result = feedbackController.getProductFeedbacks(999L, null, null, "desc");
+        var result = feedbackController.submitFeedbacks(List.of(feedback1, feedback2));
 
-        assertTrue(result.isSuccess());
-        assertNotNull(result.getData());
-        assertTrue(result.getData().isEmpty());
-        verify(userService, never()).listByIds(any(Collection.class));
+        assertFalse(result.isSuccess());
+        assertEquals("评价列表中的订单ID不一致", result.getMessage());
+        verify(feedbackMapper, never()).insert(any(Feedback.class));
     }
 
     @Test
-    @DisplayName("测试 getProductFeedbacks - 按评分筛选")
-    void testGetProductFeedbacks_FilterByRating() {
-        com.milktea.entity.User user1 = new com.milktea.entity.User();
-        user1.setId(1L);
-        user1.setNickname("用户1");
+    @DisplayName("测试 submitFeedbacks - 图片超过上限")
+    void testSubmitFeedbacks_TooManyImages() {
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(
+                1L,
+                1L,
+                5,
+                "测试评价",
+                List.of("/uploads/1.jpg", "/uploads/2.jpg", "/uploads/3.jpg", "/uploads/4.jpg")
+        );
+        when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
-        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
-        var result = feedbackController.getProductFeedbacks(1L, 5, null, "desc");
-
-        assertTrue(result.isSuccess());
-        assertEquals(1, result.getData().size());
-        assertEquals(5, result.getData().get(0).getRating());
+        assertFalse(result.isSuccess());
+        assertEquals("评价图片最多上传3张", result.getMessage());
+        verify(feedbackMapper, never()).insert(any(Feedback.class));
     }
 
     @Test
@@ -323,23 +295,18 @@ class FeedbackControllerTest {
     void testSubmitFeedbacks_WithOldTokenFormat() {
         when(authentication.getDetails()).thenReturn("notALongType");
         when(authentication.getName()).thenReturn("testuser");
-        com.milktea.entity.User testUser = new com.milktea.entity.User();
+        User testUser = new User();
         testUser.setId(1L);
         testUser.setUsername("testuser");
         when(userService.getByUsername("testuser")).thenReturn(testUser);
 
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setProductId(1L);
-        feedback.setRating(5);
-        feedback.setContent("测试评价");
-
+        FeedbackSubmitDTO feedback = buildFeedbackDTO(1L, 1L, 5, "测试评价", List.of("/uploads/img1.jpg"));
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+        var result = feedbackController.submitFeedbacks(List.of(feedback));
 
         assertTrue(result.isSuccess());
         verify(userService, times(1)).getByUsername("testuser");
@@ -348,18 +315,14 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 submitFeedbacks - 完整流程验证（多商品评价）")
     void testSubmitFeedbacks_FullFlow() {
-        Feedback feedback1 = new Feedback();
-        feedback1.setOrderId(1L);
-        feedback1.setProductId(1L);
-        feedback1.setRating(5);
-        feedback1.setContent("珍珠奶茶非常好喝！");
-        feedback1.setImages("/uploads/img1.jpg,/uploads/img2.jpg");
-
-        Feedback feedback2 = new Feedback();
-        feedback2.setOrderId(1L);
-        feedback2.setProductId(2L);
-        feedback2.setRating(4);
-        feedback2.setContent("波波烤奶也不错");
+        FeedbackSubmitDTO feedback1 = buildFeedbackDTO(
+                1L,
+                1L,
+                5,
+                "珍珠奶茶非常好喝！",
+                List.of("/uploads/img1.jpg", "/uploads/img2.jpg")
+        );
+        FeedbackSubmitDTO feedback2 = buildFeedbackDTO(1L, 2L, 4, "波波烤奶也不错", null);
 
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
@@ -370,14 +333,20 @@ class FeedbackControllerTest {
         });
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
 
-        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback1, feedback2));
+        var result = feedbackController.submitFeedbacks(List.of(feedback1, feedback2));
 
         assertTrue(result.isSuccess());
         verify(feedbackMapper, times(2)).insert(any(Feedback.class));
-
+        verify(feedbackMapper).insert(argThat(saved ->
+                saved.getProductId().equals(1L)
+                        && "[\"/uploads/img1.jpg\",\"/uploads/img2.jpg\"]".equals(saved.getImages())
+        ));
+        verify(feedbackMapper).insert(argThat(saved ->
+                saved.getProductId().equals(2L)
+                        && "[]".equals(saved.getImages())
+        ));
         verify(orderMapper).updateById(argThat(order ->
-            order.getId().equals(1L) &&
-            order.getStatus() == OrderStatus.REVIEWED
+                order.getId().equals(1L) && order.getStatus() == OrderStatus.REVIEWED
         ));
     }
 
@@ -391,37 +360,180 @@ class FeedbackControllerTest {
     }
 
     @Test
+    @DisplayName("测试 getProductFeedbacks - 解析JSON图片数组")
+    void testGetProductFeedbacks_ParseJsonImages() {
+        testFeedback.setImages("[\"/uploads/img1.jpg\",\"/uploads/img2.jpg\"]");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+        user1.setAvatarUrl("/avatar/u1.png");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertEquals(List.of("/uploads/img1.jpg", "/uploads/img2.jpg"), result.getData().get(0).getImages());
+        assertEquals("用户1", result.getData().get(0).getNickname());
+        assertEquals("/avatar/u1.png", result.getData().get(0).getAvatarUrl());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 兼容旧逗号分隔图片")
+    void testGetProductFeedbacks_ParseLegacyCsvImages() {
+        testFeedback.setImages("/uploads/img1.jpg,/uploads/img2.jpg");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(List.of("/uploads/img1.jpg", "/uploads/img2.jpg"), result.getData().get(0).getImages());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 空JSON数组返回空列表")
+    void testGetProductFeedbacks_EmptyJsonImages() {
+        testFeedback.setImages("[]");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertTrue(result.getData().get(0).getImages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 获取商品评价列表")
+    void testGetProductFeedbacks() {
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+        User user2 = new User();
+        user2.setId(2L);
+        user2.setNickname("用户2");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
+        when(userService.listByIds(anyCollection())).thenReturn(Arrays.asList(user1, user2));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+        assertEquals(2, result.getData().size());
+        assertEquals("用户1", result.getData().get(0).getNickname());
+        assertEquals("用户2", result.getData().get(1).getNickname());
+        verify(userService, times(1)).listByIds(anyCollection());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 无评价")
+    void testGetProductFeedbacks_Empty() {
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(new ArrayList<>());
+
+        var result = feedbackController.getProductFeedbacks(999L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+        assertTrue(result.getData().isEmpty());
+        verify(userService, never()).listByIds(anyCollection());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 按评分筛选")
+    void testGetProductFeedbacks_FilterByRating() {
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, 5, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertEquals(5, result.getData().get(0).getRating());
+    }
+
+    @Test
     @DisplayName("测试 getProductFeedbacks - 批量查询用户信息避免N+1")
     void testGetProductFeedbacks_BatchUserQuery() {
-        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        User user1 = new User();
         user1.setId(1L);
         user1.setNickname("用户A");
         user1.setAvatarUrl("/avatar/a.png");
-        com.milktea.entity.User user2 = new com.milktea.entity.User();
+        User user2 = new User();
         user2.setId(2L);
         user2.setNickname("用户B");
         user2.setAvatarUrl("/avatar/b.png");
 
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
-        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
+        when(userService.listByIds(anyCollection())).thenReturn(Arrays.asList(user1, user2));
 
         feedbackController.getProductFeedbacks(1L, null, null, "desc");
 
-        verify(userService, times(1)).listByIds(any(Collection.class));
+        verify(userService, times(1)).listByIds(anyCollection());
         verify(userService, never()).getById(anyLong());
     }
 
     @Test
     @DisplayName("测试 getProductFeedbacks - 用户不存在时显示匿名")
     void testGetProductFeedbacks_UserNotFound() {
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
-        when(userService.listByIds(any(Collection.class))).thenReturn(new ArrayList<>());
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(new ArrayList<>());
 
         var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
 
         assertTrue(result.isSuccess());
         assertEquals(1, result.getData().size());
         assertEquals("匿名用户", result.getData().get(0).getNickname());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 按有图筛选")
+    void testGetProductFeedbacks_FilterByHasImage() {
+        testFeedback.setImages("[\"/uploads/img1.jpg\",\"/uploads/img2.jpg\"]");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, true, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertFalse(result.getData().get(0).getImages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("测试 convertToVOList - 包含adminReply")
+    void testConvertToVOList_WithAdminReply() {
+        testFeedback.setAdminReply("感谢您的评价！");
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testFeedback));
+        when(userService.listByIds(anyCollection())).thenReturn(List.of(user1));
+
+        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals("感谢您的评价！", result.getData().get(0).getAdminReply());
     }
 
     @Test
@@ -438,7 +550,7 @@ class FeedbackControllerTest {
         assertTrue(result.isSuccess());
         assertEquals("回复成功", result.getMessage());
         verify(feedbackMapper).updateById(argThat(fb ->
-            fb.getAdminReply() != null && fb.getAdminReply().equals("感谢您的评价！")
+                fb.getAdminReply() != null && fb.getAdminReply().equals("感谢您的评价！")
         ));
     }
 
@@ -478,38 +590,13 @@ class FeedbackControllerTest {
         assertEquals("回复内容不能为空", result.getMessage());
     }
 
-    @Test
-    @DisplayName("测试 getProductFeedbacks - 按有图筛选")
-    void testGetProductFeedbacks_FilterByHasImage() {
-        testFeedback.setImages("/uploads/img1.jpg,/uploads/img2.jpg");
-        com.milktea.entity.User user1 = new com.milktea.entity.User();
-        user1.setId(1L);
-        user1.setNickname("用户1");
-
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
-        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
-
-        var result = feedbackController.getProductFeedbacks(1L, null, true, "desc");
-
-        assertTrue(result.isSuccess());
-        assertEquals(1, result.getData().size());
-        assertFalse(result.getData().get(0).getImages().isEmpty());
-    }
-
-    @Test
-    @DisplayName("测试 convertToVOList - 包含adminReply")
-    void testConvertToVOList_WithAdminReply() {
-        testFeedback.setAdminReply("感谢您的评价！");
-        com.milktea.entity.User user1 = new com.milktea.entity.User();
-        user1.setId(1L);
-        user1.setNickname("用户1");
-
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
-        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
-
-        var result = feedbackController.getProductFeedbacks(1L, null, null, "desc");
-
-        assertTrue(result.isSuccess());
-        assertEquals("感谢您的评价！", result.getData().get(0).getAdminReply());
+    private FeedbackSubmitDTO buildFeedbackDTO(Long orderId, Long productId, Integer rating, String content, List<String> images) {
+        FeedbackSubmitDTO dto = new FeedbackSubmitDTO();
+        dto.setOrderId(orderId);
+        dto.setProductId(productId);
+        dto.setRating(rating);
+        dto.setContent(content);
+        dto.setImages(images);
+        return dto;
     }
 }

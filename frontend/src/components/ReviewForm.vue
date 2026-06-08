@@ -167,7 +167,7 @@ const getFeedbackData = () => ({
   productId: props.product.productId || props.product.id,
   rating: form.rating,
   content: form.content,
-  images: form.images.join(',')
+  images: [...form.images]
 })
 
 const validate = () => {
