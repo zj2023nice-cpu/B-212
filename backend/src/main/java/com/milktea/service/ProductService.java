@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.milktea.dto.ProductAdminVO;
 import com.milktea.entity.Product;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ProductService extends IService<Product> {
@@ -13,4 +14,5 @@ public interface ProductService extends IService<Product> {
     boolean restoreStock(Long productId, int quantity);
     List<ProductAdminVO> getLowStockProducts();
     void checkAndLogLowStock(Long productId);
+    BigDecimal calculateUnitPrice(Product product, String specsJson);
 }

@@ -24,7 +24,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -96,9 +98,25 @@ public class OrderController {
             productService.checkStock(item.getProductId(), item.getQuantity());
         }
 
+        Map<Long, BigDecimal> verifiedPrices = new HashMap<>();
+        for (CartItem item : cartItems) {
+            Product product = productMapper.selectById(item.getProductId());
+            if (product == null) {
+                return Result.error("商品不存在: " + item.getProductId());
+            }
+            BigDecimal recalculated = productService.calculateUnitPrice(product, item.getSpecs());
+            if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(recalculated) != 0) {
+                logger.warn("下单价格校验失败: 购物车价格={}, 后端重算价格={}, productId={}, specs={}",
+                        item.getUnitPrice(), recalculated, item.getProductId(), item.getSpecs());
+                return Result.error("商品 [" + product.getName() + "] 价格已变动，请刷新购物车后重试");
+            }
+            verifiedPrices.put(item.getId(), recalculated);
+        }
+
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (CartItem item : cartItems) {
-            BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal itemPrice = verifiedPrices.getOrDefault(item.getId(),
+                    item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO);
             totalAmount = totalAmount.add(itemPrice.multiply(new BigDecimal(item.getQuantity())));
         }
 
@@ -168,12 +186,13 @@ public class OrderController {
                 logger.error("创建订单项时商品不存在: productId={}", item.getProductId());
                 throw new IllegalArgumentException("商品不存在: " + item.getProductId());
             }
-            BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : product.getPrice();
+            BigDecimal verifiedPrice = verifiedPrices.getOrDefault(item.getId(),
+                    item.getUnitPrice() != null ? item.getUnitPrice() : product.getPrice());
             OrderItem detail = new OrderItem();
             detail.setOrderId(order.getId());
             detail.setProductId(item.getProductId());
             detail.setProductName(product.getName());
-            detail.setProductPrice(itemPrice);
+            detail.setProductPrice(verifiedPrice);
             detail.setQuantity(item.getQuantity());
             detail.setSpecs(item.getSpecs());
             orderItemMapper.insert(detail);

@@ -179,6 +179,8 @@ class CartControllerTest {
         newCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
+        when(productService.calculateUnitPrice(eq(testProduct), eq("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}")))
+                .thenReturn(new BigDecimal("15.00"));
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doNothing().when(productService).checkStock(eq(1L), eq(1));
         when(cartItemMapper.insert(any(CartItem.class))).thenReturn(1);
@@ -208,6 +210,8 @@ class CartControllerTest {
         newCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
+        when(productService.calculateUnitPrice(eq(testProduct), eq("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}")))
+                .thenReturn(new BigDecimal("15.00"));
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existingCartItem);
         doNothing().when(productService).checkStock(eq(1L), eq(5));
         when(cartItemMapper.updateById(any(CartItem.class))).thenReturn(1);
@@ -229,6 +233,8 @@ class CartControllerTest {
         newCartItem.setUnitPrice(new BigDecimal("20.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
+        when(productService.calculateUnitPrice(eq(testProduct), eq("{\"size\":\"大杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[\"珍珠\"]}")))
+                .thenReturn(new BigDecimal("20.00"));
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doThrow(new InsufficientStockException("珍珠奶茶", 15, 10))
             .when(productService).checkStock(eq(1L), eq(15));
@@ -373,6 +379,8 @@ class CartControllerTest {
         newCartItem.setUnitPrice(new BigDecimal("20.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
+        when(productService.calculateUnitPrice(eq(testProduct), eq("{\"size\":\"大杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[\"珍珠\"]}")))
+                .thenReturn(new BigDecimal("20.00"));
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doNothing().when(productService).checkStock(eq(1L), eq(1));
         when(cartItemMapper.insert(any(CartItem.class))).thenReturn(1);

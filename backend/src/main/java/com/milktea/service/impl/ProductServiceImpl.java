@@ -1,6 +1,8 @@
 package com.milktea.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.milktea.dto.ProductAdminVO;
 import com.milktea.entity.Product;
 import com.milktea.exception.InsufficientStockException;
@@ -12,13 +14,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> implements ProductService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductServiceImpl.class);
     private static final int DEFAULT_LOW_STOCK_THRESHOLD = 10;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private ProductMapper productMapper;
@@ -183,6 +188,52 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (stock != null && stock < threshold) {
             logger.warn("【库存预警】商品库存低于阈值: productId={}, productName={}, currentStock={}, threshold={}",
                     product.getId(), product.getName(), stock, threshold);
+        }
+    }
+
+    @Override
+    public BigDecimal calculateUnitPrice(Product product, String specsJson) {
+        BigDecimal basePrice = product.getPrice();
+        if (product.getSpecPriceRules() == null || product.getSpecPriceRules().isBlank()) {
+            return basePrice;
+        }
+        try {
+            Map<String, Object> rules = objectMapper.readValue(product.getSpecPriceRules(),
+                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> specs = objectMapper.readValue(specsJson,
+                    new TypeReference<Map<String, Object>>() {});
+
+            BigDecimal markup = BigDecimal.ZERO;
+
+            Object sizeVal = specs.get("size");
+            if (sizeVal != null && rules.containsKey("size")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sizeRules = (Map<String, Object>) rules.get("size");
+                Object sizeMarkup = sizeRules.get(String.valueOf(sizeVal));
+                if (sizeMarkup != null) {
+                    markup = markup.add(new BigDecimal(String.valueOf(sizeMarkup)));
+                }
+            }
+
+            Object toppingVal = specs.get("topping");
+            if (toppingVal != null && rules.containsKey("topping")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> toppingRules = (Map<String, Object>) rules.get("topping");
+                @SuppressWarnings("unchecked")
+                List<String> toppings = (List<String>) toppingVal;
+                for (String t : toppings) {
+                    Object tMarkup = toppingRules.get(t);
+                    if (tMarkup != null) {
+                        markup = markup.add(new BigDecimal(String.valueOf(tMarkup)));
+                    }
+                }
+            }
+
+            return basePrice.add(markup);
+        } catch (Exception e) {
+            logger.warn("解析规格加价规则失败: productId={}, rules={}, specs={}, error={}",
+                    product.getId(), product.getSpecPriceRules(), specsJson, e.getMessage());
+            return basePrice;
         }
     }
 }
