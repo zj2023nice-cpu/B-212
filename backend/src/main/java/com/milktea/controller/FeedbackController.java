@@ -5,7 +5,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.milktea.annotation.ResourceOwnerCheck;
 import com.milktea.annotation.ResourceType;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.dto.FeedbackSubmitDTO;
 import com.milktea.dto.FeedbackVO;
 import com.milktea.entity.Feedback;
@@ -83,7 +85,7 @@ public class FeedbackController {
         try {
             return objectMapper.writeValueAsString(cleanImages(images));
         } catch (Exception e) {
-            throw new RuntimeException("评价图片序列化失败", e);
+            throw new BusinessException(ErrorCode.D0018, "评价图片序列化失败", e);
         }
     }
 
@@ -137,26 +139,26 @@ public class FeedbackController {
     @Transactional
     public Result<String> submitFeedbacks(@RequestBody List<FeedbackSubmitDTO> feedbacks) {
         if (feedbacks == null || feedbacks.isEmpty()) {
-            return Result.error("评价列表不能为空");
+            throw new BusinessException(ErrorCode.B0029, "评价列表不能为空");
         }
 
         Long userId = SecurityUtils.getCurrentUserId();
         Long orderId = feedbacks.get(0).getOrderId();
         if (orderId == null) {
-            return Result.error("订单ID不能为空");
+            throw new BusinessException(ErrorCode.B0030, "订单ID不能为空");
         }
 
         Order existingOrder = orderMapper.selectById(orderId);
         if (existingOrder == null) {
-            return Result.error("Order not found");
+            throw new BusinessException(ErrorCode.B0005, "Order not found");
         }
 
         if (!existingOrder.getUserId().equals(userId)) {
-            return Result.error("Not authorized to submit feedback for this order");
+            throw new BusinessException(ErrorCode.A0014, "Not authorized to submit feedback for this order");
         }
 
         if (existingOrder.getStatus() != OrderStatus.COMPLETED) {
-            return Result.error("Only completed orders can be reviewed");
+            throw new BusinessException(ErrorCode.B0038, "Only completed orders can be reviewed");
         }
 
         LambdaQueryWrapper<Feedback> existCheck = new LambdaQueryWrapper<Feedback>()
@@ -164,23 +166,23 @@ public class FeedbackController {
                 .eq(Feedback::getUserId, userId);
         Long existCount = feedbackMapper.selectCount(existCheck);
         if (existCount > 0) {
-            return Result.error("该订单已评价，不能重复评价");
+            throw new BusinessException(ErrorCode.B0031, "该订单已评价，不能重复评价");
         }
 
         for (FeedbackSubmitDTO feedbackDTO : feedbacks) {
             if (!orderId.equals(feedbackDTO.getOrderId())) {
-                return Result.error("评价列表中的订单ID不一致");
+                throw new BusinessException(ErrorCode.B0032, "评价列表中的订单ID不一致");
             }
             if (feedbackDTO.getRating() == null || feedbackDTO.getRating() < 1 || feedbackDTO.getRating() > 5) {
-                return Result.error("评分必须在1-5之间");
+                throw new BusinessException(ErrorCode.B0039, "评分必须在1-5之间");
             }
             if (feedbackDTO.getProductId() == null) {
-                return Result.error("商品ID不能为空");
+                throw new BusinessException(ErrorCode.B0040, "商品ID不能为空");
             }
 
             List<String> images = cleanImages(feedbackDTO.getImages());
             if (images.size() > MAX_IMAGES) {
-                return Result.error("评价图片最多上传3张");
+                throw new BusinessException(ErrorCode.B0041, "评价图片最多上传3张");
             }
 
             Feedback feedback = new Feedback();
@@ -249,13 +251,13 @@ public class FeedbackController {
     @PostMapping("/upload")
     public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return Result.error("请选择要上传的图片");
+            throw new BusinessException(ErrorCode.B0035, "请选择要上传的图片");
         }
 
         try {
             String contentType = file.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
-                return Result.error("只能上传图片文件");
+                throw new BusinessException(ErrorCode.B0036, "只能上传图片文件");
             }
 
             String originalFilename = file.getOriginalFilename();
@@ -278,7 +280,7 @@ public class FeedbackController {
             return Result.success(imageUrl);
         } catch (IOException e) {
             logger.error("图片上传失败: {}", e.getMessage());
-            return Result.error("图片上传失败");
+            throw new BusinessException(ErrorCode.B0037, "图片上传失败");
         }
     }
 
@@ -287,12 +289,12 @@ public class FeedbackController {
     public Result<String> replyFeedback(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String reply = body.get("reply");
         if (reply == null || reply.trim().isEmpty()) {
-            return Result.error("回复内容不能为空");
+            throw new BusinessException(ErrorCode.B0033, "回复内容不能为空");
         }
 
         Feedback feedback = feedbackMapper.selectById(id);
         if (feedback == null) {
-            return Result.error("评价不存在");
+            throw new BusinessException(ErrorCode.B0034, "评价不存在");
         }
 
         feedback.setAdminReply(reply.trim());

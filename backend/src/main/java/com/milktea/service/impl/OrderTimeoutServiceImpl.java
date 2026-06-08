@@ -1,6 +1,7 @@
 package com.milktea.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.milktea.common.ErrorCode;
 import com.milktea.config.OrderTimeoutProperties;
 import com.milktea.entity.Order;
 import com.milktea.entity.OrderCancelLog;
@@ -9,6 +10,7 @@ import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.OrderCancelLogMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.MemberService;
 import com.milktea.service.OrderTimeoutService;
 import com.milktea.service.ProductService;
@@ -130,7 +132,7 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
         if (failCount > 0) {
             String errorMsg = String.format("库存恢复失败，订单取消回滚: orderId=%d, 失败%d个商品, 详情: %s",
                     orderId, failCount, failDetails.toString());
-            throw new RuntimeException(errorMsg);
+            throw new BusinessException(ErrorCode.B0011, errorMsg);
         }
     }
 

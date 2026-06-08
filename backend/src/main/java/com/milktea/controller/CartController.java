@@ -3,7 +3,9 @@ package com.milktea.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.milktea.annotation.ResourceOwnerCheck;
 import com.milktea.annotation.ResourceType;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.dto.CartGroupVO;
 import com.milktea.entity.CartItem;
 import com.milktea.entity.Product;
@@ -70,14 +72,14 @@ public class CartController {
         
         Product product = productMapper.selectById(cartItem.getProductId());
         if (product == null) {
-            return Result.error("Product not found");
+            throw new BusinessException(ErrorCode.C0001, "Product not found");
         }
 
         BigDecimal calculatedPrice = productService.calculateUnitPrice(product, cartItem.getSpecs());
         if (cartItem.getUnitPrice() != null && cartItem.getUnitPrice().compareTo(calculatedPrice) != 0) {
             logger.warn("购物车加价校验失败: 前端价格={}, 后端计算价格={}, productId={}, specs={}",
                     cartItem.getUnitPrice(), calculatedPrice, cartItem.getProductId(), cartItem.getSpecs());
-            return Result.error("价格校验失败，请刷新后重试");
+            throw new BusinessException(ErrorCode.C0009, "价格校验失败，请刷新后重试");
         }
         cartItem.setUnitPrice(calculatedPrice);
 
@@ -97,7 +99,7 @@ public class CartController {
         } catch (InsufficientStockException e) {
             logger.warn("添加购物车时库存不足: productId={}, requested={}, available={}",
                     cartItem.getProductId(), totalQuantity, e.getAvailableStock());
-            return Result.error(e.getMessage());
+            throw new BusinessException(ErrorCode.C0003, e.getMessage());
         }
 
         if (existing != null) {
@@ -118,7 +120,7 @@ public class CartController {
             allowAdmin = false)
     public Result<String> updateQuantity(@PathVariable Long id, @RequestParam Integer quantity) {
         if (quantity <= 0) {
-            return Result.error("Quantity must be greater than 0");
+            throw new BusinessException(ErrorCode.B0049, "Quantity must be greater than 0");
         }
 
         CartItem existingCartItem = cartItemMapper.selectById(id);
@@ -128,7 +130,7 @@ public class CartController {
         } catch (InsufficientStockException e) {
             logger.warn("更新购物车数量时库存不足: productId={}, requested={}, available={}",
                     existingCartItem.getProductId(), quantity, e.getAvailableStock());
-            return Result.error(e.getMessage());
+            throw new BusinessException(ErrorCode.C0003, e.getMessage());
         }
         
         CartItem cartItem = new CartItem();

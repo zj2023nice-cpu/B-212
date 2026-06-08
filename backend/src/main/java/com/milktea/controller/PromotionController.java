@@ -2,7 +2,9 @@ package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.dto.PromotionCalculateRequest;
 import com.milktea.dto.PromotionCalculateResponse;
 import com.milktea.entity.CartItem;
@@ -40,7 +42,7 @@ public class PromotionController {
     @PostMapping
     public Result<Promotion> createPromotion(@RequestBody Promotion promotion) {
         if (!SecurityUtils.isCurrentUserAdmin()) {
-            return Result.forbidden("仅管理员可创建促销活动");
+            throw new BusinessException(ErrorCode.A0012, "仅管理员可创建促销活动");
         }
         Promotion created = promotionService.createPromotion(promotion);
         return Result.success(created);
@@ -62,7 +64,7 @@ public class PromotionController {
     @PutMapping("/{id}/status")
     public Result<Promotion> updatePromotionStatus(@PathVariable Long id, @RequestParam Integer status) {
         if (!SecurityUtils.isCurrentUserAdmin()) {
-            return Result.forbidden("仅管理员可修改促销活动状态");
+            throw new BusinessException(ErrorCode.A0012, "仅管理员可修改促销活动状态");
         }
         Promotion updated = promotionService.updatePromotionStatus(id, status);
         return Result.success(updated);
@@ -71,7 +73,7 @@ public class PromotionController {
     @DeleteMapping("/{id}")
     public Result<String> deletePromotion(@PathVariable Long id) {
         if (!SecurityUtils.isCurrentUserAdmin()) {
-            return Result.forbidden("仅管理员可删除促销活动");
+            throw new BusinessException(ErrorCode.A0012, "仅管理员可删除促销活动");
         }
         promotionService.removeById(id);
         return Result.success("已删除");

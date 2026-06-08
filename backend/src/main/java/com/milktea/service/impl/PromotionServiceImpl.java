@@ -3,8 +3,10 @@ package com.milktea.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.milktea.common.ErrorCode;
 import com.milktea.entity.Promotion;
 import com.milktea.mapper.PromotionMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.PromotionService;
 import com.milktea.util.PromotionCalculator;
 import org.slf4j.Logger;
@@ -49,7 +51,7 @@ public class PromotionServiceImpl extends ServiceImpl<PromotionMapper, Promotion
     public Promotion updatePromotionStatus(Long id, Integer status) {
         Promotion promotion = getById(id);
         if (promotion == null) {
-            throw new IllegalArgumentException("促销活动不存在");
+            throw new BusinessException(ErrorCode.B0022);
         }
         promotion.setStatus(status);
         updateById(promotion);

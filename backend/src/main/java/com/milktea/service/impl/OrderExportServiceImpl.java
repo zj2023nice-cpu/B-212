@@ -5,6 +5,7 @@ import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.milktea.common.ErrorCode;
 import com.milktea.dto.OrderExportDTO;
 import com.milktea.dto.OrderExportVO;
 import com.milktea.entity.ExportAuditLog;
@@ -16,6 +17,7 @@ import com.milktea.mapper.ExportAuditLogMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
 import com.milktea.mapper.UserMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.OrderExportService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -111,7 +113,7 @@ public class OrderExportServiceImpl implements OrderExportService {
 
         } catch (IOException e) {
             logger.error("订单导出IO异常: {}", e.getMessage(), e);
-            throw new RuntimeException("导出文件写入失败", e);
+            throw new BusinessException(ErrorCode.D0018, "导出文件写入失败", e);
         }
     }
 

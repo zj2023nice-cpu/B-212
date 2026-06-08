@@ -1,11 +1,15 @@
 package com.milktea.common;
 
+import com.milktea.exception.BusinessException;
 import com.milktea.exception.InsufficientStockException;
 import com.milktea.exception.StockConflictException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -20,6 +24,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -27,122 +33,146 @@ public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @Value("${spring.profiles.active:prod}")
+    private String activeProfile;
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
+        ErrorCode errorCode = e.getErrorCode();
+        logger.warn("业务异常: [{}] {}", errorCode.getCode(), e.getMessage());
+        ErrorResponse response = ErrorResponse.of(errorCode, e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
+    }
+
     @ExceptionHandler(InsufficientStockException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleInsufficientStockException(InsufficientStockException e) {
+    public ErrorResponse handleInsufficientStockException(InsufficientStockException e, HttpServletRequest request) {
         logger.warn("库存不足异常: {}", e.getMessage());
-        return Result.error(ResultCode.PRODUCT_STOCK_INSUFFICIENT, e.getMessage());
+        return ErrorResponse.of(ErrorCode.C0003, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(StockConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public Result<String> handleStockConflictException(StockConflictException e) {
+    public ErrorResponse handleStockConflictException(StockConflictException e, HttpServletRequest request) {
         logger.warn("库存冲突异常: {}", e.getMessage());
-        return Result.error(ResultCode.CONFLICT, e.getMessage());
+        return ErrorResponse.of(ErrorCode.B0050, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleIllegalArgumentException(IllegalArgumentException e) {
+    public ErrorResponse handleIllegalArgumentException(IllegalArgumentException e, HttpServletRequest request) {
         logger.warn("非法参数异常: {}", e.getMessage());
-        return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+        return ErrorResponse.of(ErrorCode.D0001, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleIllegalStateException(IllegalStateException e) {
+    public ErrorResponse handleIllegalStateException(IllegalStateException e, HttpServletRequest request) {
         logger.warn("非法状态异常: {}", e.getMessage());
-        return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+        return ErrorResponse.of(ErrorCode.D0001, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public Result<String> handleDuplicateKeyException(DuplicateKeyException e) {
+    public ErrorResponse handleDuplicateKeyException(DuplicateKeyException e, HttpServletRequest request) {
         logger.warn("数据重复: {}", e.getMessage());
-        return Result.error(ResultCode.DUPLICATE_KEY_ERROR);
+        return ErrorResponse.of(ErrorCode.D0010, ErrorCode.D0010.getMessage(), request.getRequestURI(), withStackTrace(e));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException e, HttpServletRequest request) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
         logger.warn("参数校验失败: {}", message);
-        return Result.error(ResultCode.UNPROCESSABLE_ENTITY, message);
+        return ErrorResponse.of(ErrorCode.D0006, message, request.getRequestURI());
     }
 
     @ExceptionHandler(BindException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleBindException(BindException e) {
+    public ErrorResponse handleBindException(BindException e, HttpServletRequest request) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
         logger.warn("参数绑定失败: {}", message);
-        return Result.error(ResultCode.UNPROCESSABLE_ENTITY, message);
+        return ErrorResponse.of(ErrorCode.D0006, message, request.getRequestURI());
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+    public ErrorResponse handleMissingServletRequestParameterException(MissingServletRequestParameterException e, HttpServletRequest request) {
         String message = String.format("缺少必要参数: %s", e.getParameterName());
         logger.warn(message);
-        return Result.error(ResultCode.PARAM_MISSING, message);
+        return ErrorResponse.of(ErrorCode.D0002, message, request.getRequestURI());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Result<String> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
-        String message = String.format("参数类型错误: 参数名=%s, 期望类型=%s", 
+    public ErrorResponse handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        String message = String.format("参数类型错误: 参数名=%s, 期望类型=%s",
                 e.getName(), e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "未知");
         logger.warn(message);
-        return Result.error(ResultCode.PARAM_TYPE_ERROR, message);
+        return ErrorResponse.of(ErrorCode.D0003, message, request.getRequestURI());
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Result<String> handleNoHandlerFoundException(NoHandlerFoundException e) {
+    public ErrorResponse handleNoHandlerFoundException(NoHandlerFoundException e, HttpServletRequest request) {
         String message = String.format("请求的资源不存在: %s", e.getRequestURL());
         logger.warn(message);
-        return Result.error(ResultCode.NOT_FOUND, message);
+        return ErrorResponse.of(ErrorCode.D0007, message, request.getRequestURI());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
-    public Result<String> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
+    public ErrorResponse handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
         String message = String.format("不支持的请求方法: %s", e.getMethod());
         logger.warn(message);
-        return Result.error(ResultCode.METHOD_NOT_ALLOWED, message);
+        return ErrorResponse.of(ErrorCode.D0008, message, request.getRequestURI());
     }
 
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public Result<String> handleAuthenticationException(AuthenticationException e) {
+    public ErrorResponse handleAuthenticationException(AuthenticationException e, HttpServletRequest request) {
         logger.warn("认证失败: {}", e.getMessage());
         if (e instanceof BadCredentialsException) {
-            return Result.error(ResultCode.USER_PASSWORD_ERROR, "用户名或密码错误");
+            return ErrorResponse.of(ErrorCode.A0005, "用户名或密码错误", request.getRequestURI());
         }
-        return Result.error(ResultCode.UNAUTHORIZED, "认证失败，请重新登录");
+        return ErrorResponse.of(ErrorCode.A0016, "认证失败，请重新登录", request.getRequestURI());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
-    public Result<String> handleAccessDeniedException(AccessDeniedException e) {
+    public ErrorResponse handleAccessDeniedException(AccessDeniedException e, HttpServletRequest request) {
         logger.warn("权限不足: {}", e.getMessage());
-        return Result.error(ResultCode.FORBIDDEN, "没有权限访问此资源");
+        return ErrorResponse.of(ErrorCode.A0012, "没有权限访问此资源", request.getRequestURI());
     }
 
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<String> handleRuntimeException(RuntimeException e) {
+    public ErrorResponse handleRuntimeException(RuntimeException e, HttpServletRequest request) {
         logger.error("运行时异常: ", e);
-        return Result.error(ResultCode.INTERNAL_SERVER_ERROR, e.getMessage());
+        return ErrorResponse.of(ErrorCode.D0018, "系统内部错误，请稍后重试", request.getRequestURI(), withStackTrace(e));
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<String> handleException(Exception e) {
+    public ErrorResponse handleException(Exception e, HttpServletRequest request) {
         logger.error("系统异常: ", e);
-        return Result.error(ResultCode.INTERNAL_SERVER_ERROR, "系统内部错误，请稍后重试");
+        return ErrorResponse.of(ErrorCode.D0018, "系统内部错误，请稍后重试", request.getRequestURI(), withStackTrace(e));
+    }
+
+    private String withStackTrace(Exception e) {
+        if (!isDevProfile()) {
+            return null;
+        }
+        StringWriter sw = new StringWriter();
+        e.printStackTrace(new PrintWriter(sw));
+        return sw.toString();
+    }
+
+    private boolean isDevProfile() {
+        return activeProfile != null && activeProfile.contains("dev");
     }
 }

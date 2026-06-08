@@ -1,7 +1,5 @@
 import axios from 'axios'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import router from '@/router'
-import { isAuthError, isForbidden, getMessage, ResultCode } from '@/utils/resultCode'
+import { handleError } from '@/utils/errorCode'
 
 function getCsrfToken() {
   const name = 'XSRF-TOKEN='
@@ -31,51 +29,18 @@ service.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = 'Bearer ' + token
     }
-    
+
     const csrfToken = getCsrfToken()
     if (csrfToken) {
       config.headers['X-XSRF-TOKEN'] = csrfToken
     }
-    
+
     return config
   },
   error => {
     return Promise.reject(error)
   }
 )
-
-function handleAuthError(code, message) {
-  const defaultMessage = '登录已过期，请重新登录'
-  const errorMessage = message || getMessage(code) || defaultMessage
-  
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-  
-  ElMessageBox.confirm(
-    errorMessage,
-    '提示',
-    {
-      confirmButtonText: '重新登录',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    router.push('/login')
-  }).catch(() => {
-    router.push('/login')
-  })
-}
-
-function handleForbiddenError(code, message) {
-  const defaultMessage = '没有权限访问此资源'
-  const errorMessage = message || getMessage(code) || defaultMessage
-  ElMessage.error(errorMessage)
-}
-
-function handleBusinessError(code, message) {
-  const errorMessage = message || getMessage(code) || '操作失败'
-  ElMessage.error(errorMessage)
-}
 
 service.interceptors.response.use(
   response => {
@@ -84,73 +49,58 @@ service.interceptors.response.use(
     }
 
     const res = response.data
-    
-    if (res.code === undefined || res.code === null) {
-      return res
+
+    if (res.errorCode) {
+      handleError(res.errorCode, res.errorMessage)
+      const error = new Error(res.errorMessage || '操作失败')
+      error.errorCode = res.errorCode
+      error.errorResponse = res
+      return Promise.reject(error)
     }
-    
-    if (res.code === ResultCode.SUCCESS) {
-      return res.data
+
+    if (res.code !== undefined && res.code !== null) {
+      if (res.code === 200) {
+        return res.data
+      }
+      handleError(null, res.message || '操作失败')
+      return Promise.reject(new Error(res.message || '操作失败'))
     }
-    
-    if (isAuthError(res.code)) {
-      handleAuthError(res.code, res.message)
-      return Promise.reject(new Error(res.message || getMessage(res.code)))
-    }
-    
-    if (isForbidden(res.code)) {
-      handleForbiddenError(res.code, res.message)
-      return Promise.reject(new Error(res.message || getMessage(res.code)))
-    }
-    
-    handleBusinessError(res.code, res.message)
-    return Promise.reject(new Error(res.message || getMessage(res.code)))
+
+    return res
   },
   error => {
-    let message = error.message
-    
     if (error.response) {
-      const status = error.response.status
-      
-      switch (status) {
-        case 400:
-          message = '请求参数错误'
-          break
-        case 401:
-          handleAuthError(ResultCode.UNAUTHORIZED, error.response.data?.message)
-          return Promise.reject(error)
-        case 403:
-          message = '没有权限访问此资源'
-          break
-        case 404:
-          message = '请求的资源不存在'
-          break
-        case 408:
-          message = '请求超时'
-          break
-        case 500:
-          message = '服务器内部错误'
-          break
-        case 502:
-          message = '网关错误'
-          break
-        case 503:
-          message = '服务不可用'
-          break
-        case 504:
-          message = '网关超时'
-          break
-        default:
-          message = `请求失败 (${status})`
+      const data = error.response.data
+      if (data && data.errorCode) {
+        handleError(data.errorCode, data.errorMessage)
+        const err = new Error(data.errorMessage || '操作失败')
+        err.errorCode = data.errorCode
+        err.errorResponse = data
+        return Promise.reject(err)
       }
+
+      const status = error.response.status
+      const statusMessages = {
+        400: '请求参数错误',
+        401: '未授权，请登录',
+        403: '没有权限访问此资源',
+        404: '请求的资源不存在',
+        408: '请求超时',
+        500: '服务器内部错误',
+        502: '网关错误',
+        503: '服务不可用',
+        504: '网关超时',
+      }
+      const message = data?.errorMessage || statusMessages[status] || `请求失败 (${status})`
+      handleError(null, message)
     } else if (error.code === 'ECONNABORTED') {
-      message = '请求超时，请稍后重试'
-    } else if (error.message.includes('Network Error')) {
-      message = '网络错误，请检查网络连接'
+      handleError(null, '请求超时，请稍后重试')
+    } else if (error.message && error.message.includes('Network Error')) {
+      handleError(null, '网络错误，请检查网络连接')
+    } else {
+      handleError(null, error.message || '操作失败')
     }
-    
-    ElMessage.error(message)
-    return Promise.reject(new Error(message))
+    return Promise.reject(error)
   }
 )
 

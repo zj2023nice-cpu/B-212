@@ -2,10 +2,12 @@ package com.milktea.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.milktea.common.ErrorCode;
 import com.milktea.dto.LoginDTO;
 import com.milktea.dto.RegisterDTO;
 import com.milktea.entity.User;
 import com.milktea.mapper.UserMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.UserService;
 import com.milktea.util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +64,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void register(RegisterDTO registerDTO) {
         if (getByUsername(registerDTO.getUsername()) != null) {
-            throw new RuntimeException("Username already exists");
+            throw new BusinessException(ErrorCode.A0007, "用户已存在");
         }
         User user = new User();
         user.setUsername(registerDTO.getUsername());

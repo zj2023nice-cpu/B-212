@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.annotation.ResourceOwnerCheck;
 import com.milktea.annotation.ResourceType;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.dto.ReceiptVO;
 import com.milktea.entity.*;
 import com.milktea.enums.DeliveryType;
@@ -82,7 +84,7 @@ public class OrderController {
         
         List<CartItem> cartItems = cartItemMapper.selectList(new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, userId));
         if (cartItems.isEmpty()) {
-            return Result.error("Cart is empty");
+            throw new BusinessException(ErrorCode.B0001, "Cart is empty");
         }
 
         for (CartItem item : cartItems) {
@@ -93,13 +95,13 @@ public class OrderController {
         for (CartItem item : cartItems) {
             Product product = productMapper.selectById(item.getProductId());
             if (product == null) {
-                return Result.error("商品不存在: " + item.getProductId());
+                throw new BusinessException(ErrorCode.C0001, "商品不存在: " + item.getProductId());
             }
             BigDecimal recalculated = productService.calculateUnitPrice(product, item.getSpecs());
             if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(recalculated) != 0) {
                 logger.warn("下单价格校验失败: 购物车价格={}, 后端重算价格={}, productId={}, specs={}",
                         item.getUnitPrice(), recalculated, item.getProductId(), item.getSpecs());
-                return Result.error("商品 [" + product.getName() + "] 价格已变动，请刷新购物车后重试");
+                throw new BusinessException(ErrorCode.C0010, "商品 [" + product.getName() + "] 价格已变动，请刷新购物车后重试");
             }
             verifiedPrices.put(item.getId(), recalculated);
         }
@@ -121,7 +123,7 @@ public class OrderController {
                 Product product = productMapper.selectById(item.getProductId());
                 String productName = product != null ? product.getName() : "未知商品";
                 logger.error("库存扣减失败，商品: {}, 数量: {}", productName, item.getQuantity());
-                throw new RuntimeException("商品 [" + productName + "] 库存不足，请刷新后重试");
+                throw new BusinessException(ErrorCode.C0003, "商品 [" + productName + "] 库存不足，请刷新后重试");
             }
         }
 
@@ -192,7 +194,7 @@ public class OrderController {
 
         if (deliveryType == DeliveryType.DELIVERY) {
             if (orderReq.getAddressId() == null) {
-                return Result.error("外卖配送请选择收货地址");
+                throw new BusinessException(ErrorCode.B0042, "外卖配送请选择收货地址");
             }
             try {
                 Address address = addressService.getByIdAndUserId(orderReq.getAddressId(), userId);
@@ -204,24 +206,24 @@ public class OrderController {
                 order.setAddress(fullAddr);
             } catch (Exception e) {
                 logger.warn("地址信息获取失败: addressId={}, reason={}", orderReq.getAddressId(), e.getMessage());
-                return Result.error("收货地址信息获取失败，请重新选择");
+                throw new BusinessException(ErrorCode.B0043, "收货地址信息获取失败，请重新选择");
             }
         } else if (deliveryType == DeliveryType.SELF_PICKUP) {
             if (orderReq.getPickupStore() == null || orderReq.getPickupStore().trim().isEmpty()) {
-                return Result.error("门店自提请选择自提门店");
+                throw new BusinessException(ErrorCode.B0044, "门店自提请选择自提门店");
             }
             if (orderReq.getPickupTime() == null) {
-                return Result.error("门店自提请选择预计自提时间");
+                throw new BusinessException(ErrorCode.B0045, "门店自提请选择预计自提时间");
             }
             LocalTime businessStart = LocalTime.of(9, 0);
             LocalTime businessEnd = LocalTime.of(22, 0);
             LocalTime pickupLocalTime = orderReq.getPickupTime().toLocalTime();
             if (pickupLocalTime.isBefore(businessStart) || !pickupLocalTime.isBefore(businessEnd)) {
-                return Result.error("自提时间需在营业时间 09:00-22:00 内");
+                throw new BusinessException(ErrorCode.B0046, "自提时间需在营业时间 09:00-22:00 内");
             }
             LocalDateTime minPickupTime = LocalDateTime.now().plusMinutes(30);
             if (orderReq.getPickupTime().isBefore(minPickupTime)) {
-                return Result.error("自提时间需在当前时间30分钟之后");
+                throw new BusinessException(ErrorCode.B0047, "自提时间需在当前时间30分钟之后");
             }
             order.setPickupStore(orderReq.getPickupStore().trim());
             order.setPickupTime(orderReq.getPickupTime());
@@ -233,7 +235,7 @@ public class OrderController {
             Product product = productMapper.selectById(item.getProductId());
             if (product == null) {
                 logger.error("创建订单项时商品不存在: productId={}", item.getProductId());
-                throw new IllegalArgumentException("商品不存在: " + item.getProductId());
+                throw new BusinessException(ErrorCode.C0001, "商品不存在: " + item.getProductId());
             }
             BigDecimal verifiedPrice = verifiedPrices.getOrDefault(item.getId(),
                     item.getUnitPrice() != null ? item.getUnitPrice() : product.getPrice());
@@ -300,7 +302,7 @@ public class OrderController {
                 OrderStatus orderStatus = OrderStatus.valueOf(status);
                 wrapper.eq(Order::getStatus, orderStatus);
             } catch (IllegalArgumentException e) {
-                return Result.error("Invalid order status");
+                throw new BusinessException(ErrorCode.B0008, "Invalid order status");
             }
         }
         if (startDate != null && !startDate.isEmpty()) {
@@ -346,7 +348,7 @@ public class OrderController {
                 OrderStatus orderStatus = OrderStatus.valueOf(status);
                 wrapper.eq(Order::getStatus, orderStatus);
             } catch (IllegalArgumentException e) {
-                return Result.error("Invalid order status");
+                throw new BusinessException(ErrorCode.B0008, "Invalid order status");
             }
         }
         if (startDate != null && !startDate.isEmpty()) {
@@ -454,22 +456,22 @@ public class OrderController {
         try {
             targetStatus = OrderStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
-            return Result.error("Invalid order status");
+            throw new BusinessException(ErrorCode.B0008, "Invalid order status");
         }
         
         OrderStatus currentStatus = existingOrder.getStatus();
         
         if (currentStatus.isTerminal()) {
-            return Result.error("Cannot update status of " + currentStatus.getDescription() + " order");
+            throw new BusinessException(ErrorCode.B0008, "Cannot update status of " + currentStatus.getDescription() + " order");
         }
         
         if (!isAdmin) {
             if (!OrderStateMachine.isUserAllowedTransition(currentStatus, targetStatus)) {
-                return Result.error("Invalid status transition");
+                throw new BusinessException(ErrorCode.B0008, "Invalid status transition");
             }
         } else {
             if (!OrderStateMachine.canTransit(currentStatus, targetStatus)) {
-                return Result.error("Invalid status transition");
+                throw new BusinessException(ErrorCode.B0008, "Invalid status transition");
             }
         }
 
@@ -478,7 +480,7 @@ public class OrderController {
         if (targetStatus == OrderStatus.PAID && currentStatus == OrderStatus.PENDING_PAYMENT) {
             Order refreshed = orderMapper.selectById(id);
             if (refreshed.getStatus() != OrderStatus.PENDING_PAYMENT) {
-                return Result.error("Order status has changed, please refresh");
+                throw new BusinessException(ErrorCode.B0048, "Order status has changed, please refresh");
             }
             try {
                 memberService.earnPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
@@ -583,7 +585,7 @@ public class OrderController {
             String errorMsg = String.format("无法取消订单：%d个商品库存恢复失败，失败详情：%s", 
                     failCount, failDetails.toString());
             logger.error(errorMsg);
-            throw new RuntimeException(errorMsg);
+            throw new BusinessException(ErrorCode.B0011, errorMsg);
         }
     }
 }

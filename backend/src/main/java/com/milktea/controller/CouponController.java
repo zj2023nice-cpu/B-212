@@ -2,7 +2,9 @@ package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.entity.Coupon;
 import com.milktea.entity.UserCoupon;
 import com.milktea.mapper.CouponMapper;
@@ -32,7 +34,7 @@ public class CouponController {
     @PostMapping
     public Result<Coupon> createCoupon(@RequestBody Coupon coupon) {
         if (!SecurityUtils.isCurrentUserAdmin()) {
-            return Result.forbidden("仅管理员可创建优惠券");
+            throw new BusinessException(ErrorCode.B0051, "仅管理员可创建优惠券");
         }
         Coupon created = couponService.createCoupon(coupon);
         return Result.success(created);
@@ -49,7 +51,7 @@ public class CouponController {
     @PutMapping("/{id}/status")
     public Result<Coupon> updateCouponStatus(@PathVariable Long id, @RequestParam Integer status) {
         if (!SecurityUtils.isCurrentUserAdmin()) {
-            return Result.forbidden("仅管理员可修改优惠券状态");
+            throw new BusinessException(ErrorCode.B0052, "仅管理员可修改优惠券状态");
         }
         Coupon updated = couponService.updateCouponStatus(id, status);
         return Result.success(updated);
@@ -91,16 +93,16 @@ public class CouponController {
                 .orElse(null);
 
         if (userCoupon == null) {
-            return Result.badRequest("优惠券不存在或不属于当前用户");
+            throw new BusinessException(ErrorCode.B0012, "优惠券不存在或不属于当前用户");
         }
 
         Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
         if (coupon == null) {
-            return Result.badRequest("优惠券信息无效");
+            throw new BusinessException(ErrorCode.B0019, "优惠券信息无效");
         }
 
         if (coupon.getThreshold() != null && orderAmount.compareTo(coupon.getThreshold()) < 0) {
-            return Result.error(11006, "未满足优惠券使用门槛，需满¥" + coupon.getThreshold());
+            throw new BusinessException(ErrorCode.B0017, "未满足优惠券使用门槛，需满¥" + coupon.getThreshold());
         }
 
         BigDecimal discount = couponService.calculateDiscount(userCouponId, orderAmount);

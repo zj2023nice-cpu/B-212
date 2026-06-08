@@ -3,8 +3,10 @@ package com.milktea.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.milktea.common.ErrorCode;
 import com.milktea.dto.ProductAdminVO;
 import com.milktea.entity.Product;
+import com.milktea.exception.BusinessException;
 import com.milktea.exception.InsufficientStockException;
 import com.milktea.mapper.ProductMapper;
 import com.milktea.service.ProductService;
@@ -53,9 +55,9 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     public void checkStock(Long productId, int quantity) {
         Product product = this.getById(productId);
         if (product == null) {
-            throw new IllegalArgumentException("商品不存在: " + productId);
+            throw new BusinessException(ErrorCode.C0001, "商品不存在: " + productId);
         }
-        
+
         Integer stock = product.getStock();
         if (stock == null) {
             stock = 0;
@@ -70,12 +72,12 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     @Transactional(rollbackFor = Exception.class)
     public boolean deductStock(Long productId, int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("扣减数量必须大于0");
+            throw new BusinessException(ErrorCode.D0027, "扣减数量必须大于0");
         }
 
         Product product = this.getById(productId);
         if (product == null) {
-            throw new IllegalArgumentException("商品不存在: " + productId);
+            throw new BusinessException(ErrorCode.C0001, "商品不存在: " + productId);
         }
 
         int updatedRows = productMapper.deductStock(productId, quantity);
@@ -95,7 +97,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     public boolean deductStockWithRetry(Long productId, int quantity, int maxRetries) {
         Product product = this.getById(productId);
         if (product == null) {
-            throw new IllegalArgumentException("商品不存在: " + productId);
+            throw new BusinessException(ErrorCode.C0001, "商品不存在: " + productId);
         }
 
         checkStock(productId, quantity);

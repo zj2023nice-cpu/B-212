@@ -3,11 +3,12 @@ package com.milktea.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.milktea.common.ResultCode;
+import com.milktea.common.ErrorCode;
 import com.milktea.entity.Coupon;
 import com.milktea.entity.UserCoupon;
 import com.milktea.mapper.CouponMapper;
 import com.milktea.mapper.UserCouponMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.CouponService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     public Coupon updateCouponStatus(Long couponId, Integer status) {
         Coupon coupon = couponMapper.selectById(couponId);
         if (coupon == null) {
-            throw new IllegalArgumentException(ResultCode.COUPON_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0012);
         }
         coupon.setStatus(status);
         couponMapper.updateById(coupon);
@@ -76,20 +77,20 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     public UserCoupon claimCoupon(Long userId, Long couponId) {
         Coupon coupon = couponMapper.selectById(couponId);
         if (coupon == null) {
-            throw new IllegalArgumentException(ResultCode.COUPON_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0012);
         }
 
         if (coupon.getStatus() != 1) {
-            throw new IllegalStateException(ResultCode.COUPON_NOT_AVAILABLE.getMessage());
+            throw new BusinessException(ErrorCode.B0016);
         }
 
         LocalDateTime now = LocalDateTime.now();
         if (now.isBefore(coupon.getStartTime()) || now.isAfter(coupon.getEndTime())) {
-            throw new IllegalStateException(ResultCode.COUPON_EXPIRED.getMessage());
+            throw new BusinessException(ErrorCode.B0015);
         }
 
         if (coupon.getUsedCount() >= coupon.getTotalCount()) {
-            throw new IllegalStateException(ResultCode.COUPON_STOCK_EXHAUSTED.getMessage());
+            throw new BusinessException(ErrorCode.B0014);
         }
 
         Long existingCount = userCouponMapper.selectCount(
@@ -98,12 +99,12 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                         .eq(UserCoupon::getCouponId, couponId)
         );
         if (existingCount > 0) {
-            throw new IllegalStateException(ResultCode.COUPON_ALREADY_CLAIMED.getMessage());
+            throw new BusinessException(ErrorCode.B0013);
         }
 
         int updated = couponMapper.incrementUsedCount(couponId);
         if (updated == 0) {
-            throw new IllegalStateException(ResultCode.COUPON_STOCK_EXHAUSTED.getMessage());
+            throw new BusinessException(ErrorCode.B0014);
         }
 
         UserCoupon userCoupon = new UserCoupon();
@@ -194,30 +195,30 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     public void useCoupon(Long userCouponId, Long userId, Long orderId) {
         UserCoupon userCoupon = userCouponMapper.selectById(userCouponId);
         if (userCoupon == null) {
-            throw new IllegalArgumentException(ResultCode.COUPON_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0012);
         }
         if (!userCoupon.getUserId().equals(userId)) {
-            throw new IllegalArgumentException(ResultCode.COUPON_INVALID.getMessage());
+            throw new BusinessException(ErrorCode.B0019);
         }
         if (userCoupon.getStatus() != 0) {
-            throw new IllegalStateException(ResultCode.COUPON_ALREADY_USED.getMessage());
+            throw new BusinessException(ErrorCode.B0018);
         }
 
         Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
         if (coupon == null) {
-            throw new IllegalArgumentException(ResultCode.COUPON_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0012);
         }
         if (coupon.getStatus() != 1) {
-            throw new IllegalStateException(ResultCode.COUPON_NOT_AVAILABLE.getMessage());
+            throw new BusinessException(ErrorCode.B0016);
         }
         LocalDateTime now = LocalDateTime.now();
         if (now.isBefore(coupon.getStartTime()) || now.isAfter(coupon.getEndTime())) {
-            throw new IllegalStateException(ResultCode.COUPON_EXPIRED.getMessage());
+            throw new BusinessException(ErrorCode.B0015);
         }
 
         int updated = userCouponMapper.useCoupon(userCouponId, userId, orderId);
         if (updated == 0) {
-            throw new IllegalStateException(ResultCode.COUPON_ALREADY_USED.getMessage());
+            throw new BusinessException(ErrorCode.B0018);
         }
 
         logger.info("优惠券核销成功: userCouponId={}, userId={}, orderId={}", userCouponId, userId, orderId);

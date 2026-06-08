@@ -1,7 +1,9 @@
 package com.milktea.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.milktea.common.ErrorCode;
 import com.milktea.common.Result;
+import com.milktea.exception.BusinessException;
 import com.milktea.entity.Favorite;
 import com.milktea.entity.Product;
 import com.milktea.mapper.ProductMapper;
@@ -28,7 +30,7 @@ public class FavoriteController {
     public Result<Favorite> addFavorite(@RequestBody Map<String, Long> params) {
         Long productId = params.get("productId");
         if (productId == null) {
-            return Result.badRequest("商品ID不能为空");
+            throw new BusinessException(ErrorCode.B0040, "商品ID不能为空");
         }
         Long userId = SecurityUtils.getCurrentUserId();
         Favorite favorite = favoriteService.addFavorite(userId, productId);

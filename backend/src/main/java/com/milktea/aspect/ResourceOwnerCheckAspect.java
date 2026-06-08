@@ -2,7 +2,8 @@ package com.milktea.aspect;
 
 import com.milktea.annotation.ResourceOwnerCheck;
 import com.milktea.annotation.ResourceType;
-import com.milktea.common.Result;
+import com.milktea.common.ErrorCode;
+import com.milktea.exception.BusinessException;
 import com.milktea.entity.CartItem;
 import com.milktea.entity.Order;
 import com.milktea.mapper.CartItemMapper;
@@ -38,11 +39,11 @@ public class ResourceOwnerCheckAspect {
         Long ownerId = loadResourceOwnerId(resourceOwnerCheck.resourceType(), resourceId, resourceOwnerCheck.notFoundMessage());
 
         if (ownerId == null) {
-            return Result.error(resourceOwnerCheck.notFoundMessage());
+            throw new BusinessException(ErrorCode.D0007, resourceOwnerCheck.notFoundMessage());
         }
 
         if (!isAdmin && !ownerId.equals(currentUserId)) {
-            return Result.error(resourceOwnerCheck.notAuthorizedMessage());
+            throw new BusinessException(ErrorCode.A0013, resourceOwnerCheck.notAuthorizedMessage());
         }
 
         return joinPoint.proceed();

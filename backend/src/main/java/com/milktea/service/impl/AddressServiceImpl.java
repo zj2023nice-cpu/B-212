@@ -2,9 +2,10 @@ package com.milktea.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.milktea.common.ResultCode;
+import com.milktea.common.ErrorCode;
 import com.milktea.entity.Address;
 import com.milktea.mapper.AddressMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.AddressService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,7 @@ public class AddressServiceImpl implements AddressService {
                 .eq(Address::getId, id)
                 .eq(Address::getUserId, userId));
         if (address == null) {
-            throw new IllegalArgumentException(ResultCode.ADDRESS_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0020);
         }
         return address;
     }
@@ -48,7 +49,7 @@ public class AddressServiceImpl implements AddressService {
         Long count = addressMapper.selectCount(new LambdaQueryWrapper<Address>()
                 .eq(Address::getUserId, address.getUserId()));
         if (count >= MAX_ADDRESS_COUNT) {
-            throw new IllegalStateException(ResultCode.ADDRESS_LIMIT_EXCEEDED.getMessage());
+            throw new BusinessException(ErrorCode.B0021);
         }
 
         if (address.getIsDefault() != null && address.getIsDefault() == 1) {
@@ -69,7 +70,7 @@ public class AddressServiceImpl implements AddressService {
                 .eq(Address::getId, address.getId())
                 .eq(Address::getUserId, address.getUserId()));
         if (existing == null) {
-            throw new IllegalArgumentException(ResultCode.ADDRESS_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0020);
         }
 
         if (address.getIsDefault() != null && address.getIsDefault() == 1) {
@@ -88,7 +89,7 @@ public class AddressServiceImpl implements AddressService {
                 .eq(Address::getId, id)
                 .eq(Address::getUserId, userId));
         if (existing == null) {
-            throw new IllegalArgumentException(ResultCode.ADDRESS_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0020);
         }
 
         addressMapper.deleteById(id);
@@ -102,7 +103,7 @@ public class AddressServiceImpl implements AddressService {
                 .eq(Address::getId, id)
                 .eq(Address::getUserId, userId));
         if (existing == null) {
-            throw new IllegalArgumentException(ResultCode.ADDRESS_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.B0020);
         }
 
         clearDefault(userId);

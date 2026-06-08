@@ -2,7 +2,8 @@ package com.milktea.security;
 
 import com.milktea.util.CsrfTokenUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.milktea.common.Result;
+import com.milktea.common.ErrorResponse;
+import com.milktea.common.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,8 +38,8 @@ public class CsrfTokenValidationFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
             
-            Result<Void> errorResult = Result.error("Invalid CSRF token");
-            response.getWriter().write(objectMapper.writeValueAsString(errorResult));
+            ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.A0012, "Invalid CSRF token", request.getRequestURI());
+            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
             return;
         }
         

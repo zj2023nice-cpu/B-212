@@ -2,11 +2,12 @@ package com.milktea.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.milktea.common.ResultCode;
+import com.milktea.common.ErrorCode;
 import com.milktea.entity.Favorite;
 import com.milktea.entity.Product;
 import com.milktea.mapper.FavoriteMapper;
 import com.milktea.mapper.ProductMapper;
+import com.milktea.exception.BusinessException;
 import com.milktea.service.FavoriteService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     public Favorite addFavorite(Long userId, Long productId) {
         Product product = productMapper.selectById(productId);
         if (product == null) {
-            throw new IllegalArgumentException(ResultCode.PRODUCT_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.C0001);
         }
 
         Favorite existing = favoriteMapper.selectOne(new LambdaQueryWrapper<Favorite>()

@@ -1,7 +1,8 @@
 package com.milktea.controller;
 
 import com.milktea.common.Result;
-import com.milktea.common.ResultCode;
+import com.milktea.common.ErrorCode;
+import com.milktea.exception.BusinessException;
 import com.milktea.dto.LoginDTO;
 import com.milktea.dto.RegisterDTO;
 import com.milktea.entity.User;
@@ -68,16 +69,16 @@ public class AuthController {
     @PostMapping("/avatar")
     public Result<Map<String, String>> uploadAvatar(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            return Result.error(ResultCode.PARAM_MISSING, "请选择要上传的头像文件");
+            throw new BusinessException(ErrorCode.D0002, "请选择要上传的头像文件");
         }
 
         if (file.getSize() > MAX_AVATAR_SIZE) {
-            return Result.error(ResultCode.FILE_SIZE_EXCEEDED, "头像文件大小不能超过2MB");
+            throw new BusinessException(ErrorCode.D0016, "头像文件大小不能超过2MB");
         }
 
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
-            return Result.error(ResultCode.FILE_TYPE_INVALID, "文件名不能为空");
+            throw new BusinessException(ErrorCode.D0015, "文件名不能为空");
         }
 
         String extension = "";
@@ -86,16 +87,16 @@ public class AuthController {
             extension = originalFilename.substring(dotIndex + 1).toLowerCase();
         }
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            return Result.error(ResultCode.FILE_TYPE_INVALID, "只支持JPG和PNG格式的图片");
+            throw new BusinessException(ErrorCode.D0015, "只支持JPG和PNG格式的图片");
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            return Result.error(ResultCode.FILE_TYPE_INVALID, "只支持JPG和PNG格式的图片");
+            throw new BusinessException(ErrorCode.D0015, "只支持JPG和PNG格式的图片");
         }
 
         if (!validateImageMagicBytes(file)) {
-            return Result.error(ResultCode.FILE_TYPE_INVALID, "文件内容与声明的图片类型不匹配，疑似恶意文件");
+            throw new BusinessException(ErrorCode.D0015, "文件内容与声明的图片类型不匹配，疑似恶意文件");
         }
 
         String safeFilename = UUID.randomUUID().toString().replace("-", "") + "." + extension;
@@ -108,7 +109,7 @@ public class AuthController {
 
             Path filePath = uploadPath.resolve(safeFilename).normalize();
             if (!filePath.startsWith(uploadPath)) {
-                return Result.error(ResultCode.FILE_UPLOAD_FAILED, "非法文件路径");
+                throw new BusinessException(ErrorCode.D0014, "非法文件路径");
             }
 
             file.transferTo(filePath.toFile());
@@ -139,7 +140,7 @@ public class AuthController {
             return Result.success(result);
         } catch (IOException e) {
             logger.error("头像上传失败: {}", e.getMessage());
-            return Result.error(ResultCode.FILE_UPLOAD_FAILED, "头像上传失败，请稍后重试");
+            throw new BusinessException(ErrorCode.D0014, "头像上传失败，请稍后重试");
         }
     }
 
