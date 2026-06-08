@@ -39,3 +39,6 @@ export const addAddress = (data) => request.post('/addresses', data)
 export const updateAddress = (id, data) => request.put(`/addresses/${id}`, data)
 export const deleteAddress = (id) => request.delete(`/addresses/${id}`)
 export const setDefaultAddress = (id) => request.put(`/addresses/${id}/default`)
+
+export const getHotRanking = (params) => request.get('/ranking/hot', { params })
+export const getRecommendation = (params) => request.get('/ranking/recommend', { params })
