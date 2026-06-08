@@ -63,6 +63,10 @@ CREATE TABLE `orders` (
     `user_coupon_id` BIGINT COMMENT '使用的优惠券ID',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0-待支付, 1-制作中, 2-配送中, 4-已送达, 5-已评价',
     `remark` VARCHAR(255) COMMENT '备注',
+    `address_id` BIGINT COMMENT '收货地址ID',
+    `address_contact_name` VARCHAR(50) COMMENT '收货联系人',
+    `address_phone` VARCHAR(20) COMMENT '收货手机号',
+    `address_full` VARCHAR(500) COMMENT '完整收货地址',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -160,3 +164,19 @@ CREATE TABLE `points_records` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB COMMENT='积分记录表';
+
+-- 12. 收货地址表
+CREATE TABLE `addresses` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `contact_name` VARCHAR(50) NOT NULL COMMENT '联系人姓名',
+    `phone` VARCHAR(20) NOT NULL COMMENT '手机号',
+    `province` VARCHAR(50) NOT NULL COMMENT '省',
+    `city` VARCHAR(50) NOT NULL COMMENT '市',
+    `district` VARCHAR(50) NOT NULL COMMENT '区',
+    `detail_address` VARCHAR(200) NOT NULL COMMENT '详细地址',
+    `is_default` TINYINT DEFAULT 0 COMMENT '是否默认: 0-否, 1-是',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='收货地址表';

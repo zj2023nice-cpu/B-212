@@ -89,6 +89,10 @@ public enum ResultCode {
     COUPON_ALREADY_USED(11007, "优惠券已使用"),
     COUPON_INVALID(11008, "优惠券无效"),
 
+    ADDRESS_NOT_FOUND(12001, "收货地址不存在"),
+    ADDRESS_LIMIT_EXCEEDED(12002, "收货地址数量已达上限"),
+    ADDRESS_NOT_AUTHORIZED(12003, "无权操作此地址"),
+
     THIRD_PARTY_ERROR(10001, "第三方服务调用失败"),
     SMS_SEND_FAILED(10002, "短信发送失败"),
     EMAIL_SEND_FAILED(10003, "邮件发送失败"),

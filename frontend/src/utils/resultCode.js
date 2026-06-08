@@ -86,6 +86,10 @@ export const ResultCode = {
   COUPON_THRESHOLD_NOT_MET: 11006,
   COUPON_ALREADY_USED: 11007,
   COUPON_INVALID: 11008,
+
+  ADDRESS_NOT_FOUND: 12001,
+  ADDRESS_LIMIT_EXCEEDED: 12002,
+  ADDRESS_NOT_AUTHORIZED: 12003,
 }
 
 export const ResultCodeMessages = {
@@ -176,6 +180,10 @@ export const ResultCodeMessages = {
   [ResultCode.COUPON_THRESHOLD_NOT_MET]: '未满足优惠券使用门槛',
   [ResultCode.COUPON_ALREADY_USED]: '优惠券已使用',
   [ResultCode.COUPON_INVALID]: '优惠券无效',
+
+  [ResultCode.ADDRESS_NOT_FOUND]: '收货地址不存在',
+  [ResultCode.ADDRESS_LIMIT_EXCEEDED]: '收货地址数量已达上限',
+  [ResultCode.ADDRESS_NOT_AUTHORIZED]: '无权操作此地址',
 }
 
 export function getMessage(code) {

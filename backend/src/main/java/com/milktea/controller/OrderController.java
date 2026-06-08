@@ -9,6 +9,7 @@ import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
 import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
+import com.milktea.service.AddressService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,9 @@ public class OrderController {
 
     @Autowired
     private MemberService memberService;
+
+    @Autowired
+    private AddressService addressService;
 
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -137,6 +141,19 @@ public class OrderController {
         order.setUserCouponId(userCouponId);
         order.setStatus(1);
         order.setRemark(orderReq.getRemark());
+
+        if (orderReq.getAddressId() != null) {
+            try {
+                Address address = addressService.getByIdAndUserId(orderReq.getAddressId(), userId);
+                order.setAddressId(address.getId());
+                order.setAddressContactName(address.getContactName());
+                order.setAddressPhone(address.getPhone());
+                order.setAddressFull(address.getProvince() + address.getCity() + address.getDistrict() + address.getDetailAddress());
+            } catch (Exception e) {
+                logger.warn("地址信息获取失败，订单将不带地址信息: addressId={}, reason={}", orderReq.getAddressId(), e.getMessage());
+            }
+        }
+
         orderMapper.insert(order);
 
         for (CartItem item : cartItems) {

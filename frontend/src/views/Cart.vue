@@ -35,6 +35,17 @@
 
     <el-dialog v-model="checkoutVisible" title="确认订单" width="500px">
       <el-form label-position="top">
+        <el-form-item label="收货地址">
+          <div v-if="selectedAddress" class="w-full border rounded-lg p-3 cursor-pointer hover:border-primary transition-all" @click="addressDialogVisible = true">
+            <div class="flex items-center gap-2">
+              <span class="font-bold">{{ selectedAddress.contactName }}</span>
+              <span class="text-gray-500">{{ selectedAddress.phone }}</span>
+              <el-tag v-if="selectedAddress.isDefault === 1" size="small" type="danger">默认</el-tag>
+            </div>
+            <div class="text-sm text-gray-600 mt-1">{{ selectedAddress.province }}{{ selectedAddress.city }}{{ selectedAddress.district }}{{ selectedAddress.detailAddress }}</div>
+          </div>
+          <el-button v-else type="primary" plain class="w-full" @click="addressDialogVisible = true">选择收货地址</el-button>
+        </el-form-item>
         <el-form-item label="选择优惠券">
           <el-select
             v-model="selectedCouponId"
@@ -81,17 +92,22 @@
         </div>
       </template>
     </el-dialog>
+
+    <AddressDialog v-model="addressDialogVisible" :selectedAddressId="selectedAddress?.id" @select="handleAddressSelect" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useCartStore } from '@/store/cart'
+import { useAddressStore } from '@/store/address'
 import { getProducts, updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount } from '@/api'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import AddressDialog from '@/views/AddressDialog.vue'
 
 const cartStore = useCartStore()
+const addressStore = useAddressStore()
 const router = useRouter()
 const allProducts = ref([])
 const checkoutVisible = ref(false)
@@ -103,6 +119,8 @@ const discountAmount = ref(0)
 const memberDiscountAmount = ref(0)
 const memberDiscountRate = ref(0)
 const memberLevelName = ref('普通会员')
+const addressDialogVisible = ref(false)
+const selectedAddress = ref(null)
 
 const cartItemsWithProduct = computed(() => {
   return cartStore.items.map(item => ({
@@ -164,6 +182,16 @@ const handleCheckout = async () => {
   discountAmount.value = 0
   checkoutVisible.value = true
   try {
+    await addressStore.fetchAddresses()
+    if (selectedAddress.value) {
+      const still = addressStore.addresses.find(a => a.id === selectedAddress.value.id)
+      if (!still) selectedAddress.value = null
+    }
+    if (!selectedAddress.value && addressStore.defaultAddress) {
+      selectedAddress.value = addressStore.defaultAddress
+    }
+  } catch (e) {}
+  try {
     const amount = parseFloat(totalPrice.value)
     const data = await getAvailableCoupons({ orderAmount: amount })
     availableCoupons.value = data.map(uc => ({
@@ -208,13 +236,18 @@ const handleCouponChange = async (val) => {
   }
 }
 
+const handleAddressSelect = (addr) => {
+  selectedAddress.value = addr
+}
+
 const confirmOrder = async () => {
   submitting.value = true
   try {
     await createOrder({
       totalAmount: totalPrice.value,
       remark: remark.value,
-      userCouponId: selectedCouponId.value || undefined
+      userCouponId: selectedCouponId.value || undefined,
+      addressId: selectedAddress.value?.id || undefined
     })
     ElMessage.success('支付成功，订单已下达')
     await cartStore.fetchCart()

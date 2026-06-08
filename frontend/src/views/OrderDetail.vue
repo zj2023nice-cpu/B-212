@@ -23,6 +23,16 @@
         </el-steps>
       </div>
 
+      <!-- Address Section -->
+      <div v-if="order?.addressFull" class="p-8 border-t">
+        <h4 class="font-bold mb-3">收货信息</h4>
+        <div class="flex items-center gap-4 text-sm">
+          <span class="text-gray-600"><span class="font-medium text-gray-800">{{ order.addressContactName }}</span></span>
+          <span class="text-gray-600">{{ order.addressPhone }}</span>
+        </div>
+        <div class="text-sm text-gray-500 mt-1">{{ order.addressFull }}</div>
+      </div>
+
       <!-- Items Section -->
       <div class="p-8 bg-gray-50 border-t">
         <h4 class="font-bold mb-4">商品详情</h4>
