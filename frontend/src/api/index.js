@@ -54,3 +54,9 @@ export const markNotificationRead = (id) => request.put(`/notifications/${id}/re
 export const markAllNotificationsRead = () => request.put('/notifications/read-all')
 export const batchMarkNotificationsRead = (ids) => request.put('/notifications/batch-read', ids)
 export const deleteNotification = (id) => request.delete(`/notifications/${id}`)
+
+export const addFavorite = (productId) => request.post('/favorites', { productId })
+export const removeFavorite = (productId) => request.delete(`/favorites/${productId}`)
+export const getFavoriteList = (params) => request.get('/favorites', { params })
+export const checkFavorite = (productId) => request.get('/favorites/check', { params: { productId } })
+export const batchCheckFavorite = (productIds) => request.post('/favorites/batch-check', productIds)

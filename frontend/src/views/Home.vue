@@ -143,6 +143,20 @@
                 :src="product.image"
                 class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
+              <div class="absolute top-2 left-2 z-10">
+                <el-button
+                  circle
+                  size="small"
+                  :class="favoriteMap[product.id] ? 'is-favorited' : ''"
+                  class="favorite-btn"
+                  @click.stop="toggleFavorite(product)"
+                >
+                  <el-icon :size="16">
+                    <svg v-if="favoriteMap[product.id]" viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="1em" height="1em"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                  </el-icon>
+                </el-button>
+              </div>
               <div class="absolute bottom-2 right-2">
                 <el-button
                   type="primary"
@@ -234,7 +248,7 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
-import { getCategories, getProducts, getHotRanking, getRecommendation } from '@/api'
+import { getCategories, getProducts, getHotRanking, getRecommendation, addFavorite, removeFavorite, batchCheckFavorite } from '@/api'
 import { useCartStore } from '@/store/cart'
 import { ElMessage } from 'element-plus'
 import { Trophy, Star, Search, Plus, ArrowRight } from '@element-plus/icons-vue'
@@ -259,6 +273,37 @@ const rankingDays = ref(7)
 const rankingCategoryId = ref(null)
 
 const recommendations = ref([])
+
+const favoriteMap = reactive({})
+
+const toggleFavorite = async (product) => {
+  try {
+    if (favoriteMap[product.id]) {
+      await removeFavorite(product.id)
+      favoriteMap[product.id] = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await addFavorite(product.id)
+      favoriteMap[product.id] = true
+      ElMessage.success('已收藏')
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+const fetchFavoriteStatus = async () => {
+  if (products.value.length === 0) return
+  try {
+    const productIds = products.value.map(p => p.id)
+    const result = await batchCheckFavorite(productIds)
+    Object.keys(result).forEach(pid => {
+      favoriteMap[Number(pid)] = result[pid]
+    })
+  } catch (e) {
+    // ignore
+  }
+}
 
 const specs = reactive({
   temp: '常规冰',
@@ -331,6 +376,7 @@ const fetchProducts = async () => {
   const data = await getProducts(params)
   products.value = data.records
   total.value = data.total
+  await fetchFavoriteStatus()
 }
 
 const fetchHotRanking = async () => {
@@ -368,5 +414,21 @@ onMounted(async () => {
 }
 .spec-dialog .el-dialog__header {
   padding-bottom: 0;
+}
+.favorite-btn {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(4px);
+  border: none !important;
+  color: #999 !important;
+  transition: all 0.3s;
+}
+.favorite-btn:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #f56c6c !important;
+  transform: scale(1.15);
+}
+.favorite-btn.is-favorited {
+  background: rgba(245, 108, 108, 0.1) !important;
+  color: #f56c6c !important;
 }
 </style>

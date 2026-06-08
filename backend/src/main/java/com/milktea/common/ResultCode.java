@@ -93,6 +93,9 @@ public enum ResultCode {
     ADDRESS_LIMIT_EXCEEDED(12002, "收货地址数量已达上限"),
     ADDRESS_NOT_AUTHORIZED(12003, "无权操作此地址"),
 
+    FAVORITE_ALREADY_EXISTS(13001, "已收藏该商品"),
+    FAVORITE_NOT_FOUND(13002, "收藏记录不存在"),
+
     THIRD_PARTY_ERROR(10001, "第三方服务调用失败"),
     SMS_SEND_FAILED(10002, "短信发送失败"),
     EMAIL_SEND_FAILED(10003, "邮件发送失败"),

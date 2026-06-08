@@ -208,3 +208,14 @@ CREATE TABLE `notifications` (
     INDEX `idx_user_id` (`user_id`),
     INDEX `idx_user_read` (`user_id`, `is_read`)
 ) ENGINE=InnoDB COMMENT='站内通知表';
+
+-- 15. 商品收藏表
+CREATE TABLE `favorites` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `product_id` BIGINT NOT NULL COMMENT '商品ID',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    UNIQUE KEY `uk_user_product` (`user_id`, `product_id`)
+) ENGINE=InnoDB COMMENT='商品收藏表';

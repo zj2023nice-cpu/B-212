@@ -11,7 +11,20 @@
         </div>
         <div class="md:w-1/2 p-8 flex flex-col justify-between">
           <div>
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">{{ product?.name }}</h1>
+            <div class="flex items-center gap-3 mb-2">
+              <h1 class="text-2xl font-bold text-gray-800">{{ product?.name }}</h1>
+              <el-button
+                circle
+                :class="isFavorited ? 'is-favorited' : ''"
+                class="favorite-btn-detail"
+                @click="toggleFavorite"
+              >
+                <el-icon :size="18">
+                  <svg v-if="isFavorited" viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="1em" height="1em"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                </el-icon>
+              </el-button>
+            </div>
             <p class="text-gray-500 mb-6">{{ product?.description }}</p>
             <div class="text-3xl font-bold text-primary mb-6">
               ¥{{ product?.price }}
@@ -62,7 +75,7 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import { useRoute } from 'vue-router'
-import { getProducts } from '@/api'
+import { getProducts, addFavorite, removeFavorite, checkFavorite } from '@/api'
 import { useCartStore } from '@/store/cart'
 import { ElMessage } from 'element-plus'
 import { ShoppingCart } from '@element-plus/icons-vue'
@@ -72,6 +85,7 @@ const route = useRoute()
 const cartStore = useCartStore()
 const productId = route.params.id
 const product = ref(null)
+const isFavorited = ref(false)
 
 const specs = reactive({
   temp: '常规冰',
@@ -95,5 +109,49 @@ const handleAddToCart = async () => {
   ElMessage.success('已加入购物车')
 }
 
-onMounted(fetchProduct)
+const fetchFavoriteStatus = async () => {
+  try {
+    const result = await checkFavorite(Number(productId))
+    isFavorited.value = result.favorited
+  } catch (e) {
+    // ignore
+  }
+}
+
+const toggleFavorite = async () => {
+  try {
+    if (isFavorited.value) {
+      await removeFavorite(Number(productId))
+      isFavorited.value = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await addFavorite(Number(productId))
+      isFavorited.value = true
+      ElMessage.success('已收藏')
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+onMounted(async () => {
+  await fetchProduct()
+  await fetchFavoriteStatus()
+})
 </script>
+
+<style scoped>
+.favorite-btn-detail {
+  border: none !important;
+  color: #999 !important;
+  transition: all 0.3s;
+}
+.favorite-btn-detail:hover {
+  color: #f56c6c !important;
+  transform: scale(1.15);
+}
+.favorite-btn-detail.is-favorited {
+  background: rgba(245, 108, 108, 0.1) !important;
+  color: #f56c6c !important;
+}
+</style>

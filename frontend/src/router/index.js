@@ -64,6 +64,11 @@ const routes = [
         path: 'notifications',
         name: 'NotificationCenter',
         component: () => import('../views/NotificationCenter.vue')
+      },
+      {
+        path: 'favorites',
+        name: 'MyFavorites',
+        component: () => import('../views/MyFavorites.vue')
       }
     ]
   }

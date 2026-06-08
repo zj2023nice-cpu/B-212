@@ -4,6 +4,7 @@ import com.milktea.exception.InsufficientStockException;
 import com.milktea.exception.StockConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -52,6 +53,13 @@ public class GlobalExceptionHandler {
     public Result<String> handleIllegalStateException(IllegalStateException e) {
         logger.warn("非法状态异常: {}", e.getMessage());
         return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Result<String> handleDuplicateKeyException(DuplicateKeyException e) {
+        logger.warn("数据重复: {}", e.getMessage());
+        return Result.error(ResultCode.DUPLICATE_KEY_ERROR);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
