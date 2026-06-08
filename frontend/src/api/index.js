@@ -65,3 +65,10 @@ export const getDashboardData = () => request.get('/admin/dashboard')
 
 export const adminListOrders = (params) => request.get('/orders/admin/list', { params })
 export const exportOrders = (params) => request.get('/admin/orders/export', { params, responseType: 'blob', timeout: 60000 })
+
+export const adminListProducts = (params) => request.get('/admin/products', { params })
+export const adminGetLowStockProducts = () => request.get('/admin/products/low-stock')
+export const adminCreateProduct = (data) => request.post('/admin/products', data)
+export const adminUpdateProduct = (id, data) => request.put(`/admin/products/${id}`, data)
+export const adminUpdateProductStatus = (id, status) => request.put(`/admin/products/${id}/status`, null, { params: { status } })
+export const adminGetCategories = () => request.get('/admin/products/categories')

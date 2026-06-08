@@ -75,6 +75,12 @@ const routes = [
         name: 'Dashboard',
         component: () => import('../views/Dashboard.vue'),
         meta: { requiresAdmin: true }
+      },
+      {
+        path: 'admin/products',
+        name: 'ProductAdmin',
+        component: () => import('../views/ProductAdmin.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }

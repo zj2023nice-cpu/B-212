@@ -83,6 +83,7 @@
                 <el-dropdown-item @click="$router.push('/my-coupons')">我的优惠券</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/notifications')">消息中心</el-dropdown-item>
                 <el-dropdown-item v-if="userStore.user?.role === 'ADMIN'" @click="$router.push('/coupon-admin')">优惠券管理</el-dropdown-item>
+                <el-dropdown-item v-if="userStore.user?.role === 'ADMIN'" @click="$router.push('/admin/products')">商品管理</el-dropdown-item>
                 <el-dropdown-item v-if="userStore.user?.role === 'ADMIN'" @click="$router.push('/admin/dashboard')">管理仪表盘</el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
