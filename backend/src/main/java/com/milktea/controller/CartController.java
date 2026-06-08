@@ -1,6 +1,8 @@
 package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.milktea.annotation.ResourceOwnerCheck;
+import com.milktea.annotation.ResourceType;
 import com.milktea.common.Result;
 import com.milktea.dto.CartGroupVO;
 import com.milktea.entity.CartItem;
@@ -9,7 +11,7 @@ import com.milktea.exception.InsufficientStockException;
 import com.milktea.mapper.CartItemMapper;
 import com.milktea.mapper.ProductMapper;
 import com.milktea.service.ProductService;
-import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -20,7 +22,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -33,26 +34,14 @@ public class CartController {
     private CartItemMapper cartItemMapper;
 
     @Autowired
-    private UserService userService;
-
-    @Autowired
     private ProductService productService;
 
     @Autowired
     private ProductMapper productMapper;
 
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
-
     @GetMapping
     public Result<List<CartGroupVO>> getCart() {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         List<CartItem> cartItems = cartItemMapper.selectList(
                 new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, userId));
 
@@ -77,7 +66,7 @@ public class CartController {
 
     @PostMapping
     public Result<String> addToCart(@RequestBody CartItem cartItem) {
-        cartItem.setUserId(getCurrentUserId());
+        cartItem.setUserId(SecurityUtils.getCurrentUserId());
         
         Product product = productMapper.selectById(cartItem.getProductId());
         if (product == null) {
@@ -123,19 +112,21 @@ public class CartController {
     }
 
     @PutMapping("/{id}")
+    @ResourceOwnerCheck(resourceType = ResourceType.CART_ITEM, idParam = "id",
+            notFoundMessage = "Cart item not found",
+            notAuthorizedMessage = "Not authorized to update this cart item",
+            allowAdmin = false)
     public Result<String> updateQuantity(@PathVariable Long id, @RequestParam Integer quantity) {
         if (quantity <= 0) {
             return Result.error("Quantity must be greater than 0");
         }
 
-        Long currentUserId = getCurrentUserId();
         CartItem existingCartItem = cartItemMapper.selectById(id);
-        
         if (existingCartItem == null) {
             return Result.error("Cart item not found");
         }
-        
-        if (!existingCartItem.getUserId().equals(currentUserId)) {
+
+        if (!existingCartItem.getUserId().equals(SecurityUtils.getCurrentUserId())) {
             return Result.error("Not authorized to update this cart item");
         }
 
@@ -155,25 +146,25 @@ public class CartController {
     }
 
     @DeleteMapping("/{id}")
+    @ResourceOwnerCheck(resourceType = ResourceType.CART_ITEM, idParam = "id",
+            notFoundMessage = "Cart item not found",
+            notAuthorizedMessage = "Not authorized to delete this cart item",
+            allowAdmin = false)
     public Result<String> removeFromCart(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserId();
         CartItem existingCartItem = cartItemMapper.selectById(id);
-        
         if (existingCartItem == null) {
             return Result.error("Cart item not found");
         }
-        
-        if (!existingCartItem.getUserId().equals(currentUserId)) {
+        if (!existingCartItem.getUserId().equals(SecurityUtils.getCurrentUserId())) {
             return Result.error("Not authorized to delete this cart item");
         }
-        
         cartItemMapper.deleteById(id);
         return Result.success("Removed");
     }
 
     @DeleteMapping("/clear")
     public Result<String> clearCart() {
-        cartItemMapper.delete(new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, getCurrentUserId()));
+        cartItemMapper.delete(new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, SecurityUtils.getCurrentUserId()));
         return Result.success("Cleared");
     }
 }

@@ -7,16 +7,13 @@ import com.milktea.entity.Coupon;
 import com.milktea.entity.UserCoupon;
 import com.milktea.mapper.CouponMapper;
 import com.milktea.service.CouponService;
-import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -32,27 +29,9 @@ public class CouponController {
     @Autowired
     private CouponMapper couponMapper;
 
-    @Autowired
-    private UserService userService;
-
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
-
-    private boolean isCurrentUserAdmin() {
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
-        return authorities.stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-    }
-
     @PostMapping
     public Result<Coupon> createCoupon(@RequestBody Coupon coupon) {
-        if (!isCurrentUserAdmin()) {
+        if (!SecurityUtils.isCurrentUserAdmin()) {
             return Result.forbidden("仅管理员可创建优惠券");
         }
         Coupon created = couponService.createCoupon(coupon);
@@ -69,7 +48,7 @@ public class CouponController {
 
     @PutMapping("/{id}/status")
     public Result<Coupon> updateCouponStatus(@PathVariable Long id, @RequestParam Integer status) {
-        if (!isCurrentUserAdmin()) {
+        if (!SecurityUtils.isCurrentUserAdmin()) {
             return Result.forbidden("仅管理员可修改优惠券状态");
         }
         Coupon updated = couponService.updateCouponStatus(id, status);
@@ -78,7 +57,7 @@ public class CouponController {
 
     @PostMapping("/{id}/claim")
     public Result<UserCoupon> claimCoupon(@PathVariable Long id) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         UserCoupon userCoupon = couponService.claimCoupon(userId, id);
         return Result.success(userCoupon);
     }
@@ -88,14 +67,14 @@ public class CouponController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) Integer status) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         return Result.success(couponService.getUserCoupons(userId, status, page, pageSize));
     }
 
     @GetMapping("/available")
     public Result<List<UserCoupon>> getAvailableCoupons(
             @RequestParam(required = false) BigDecimal orderAmount) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         return Result.success(couponService.getAvailableCoupons(userId, orderAmount));
     }
 
@@ -104,7 +83,7 @@ public class CouponController {
         Long userCouponId = Long.valueOf(params.get("userCouponId").toString());
         BigDecimal orderAmount = new BigDecimal(params.get("orderAmount").toString());
 
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         UserCoupon userCoupon = couponService.getUserCoupons(userId, null, 1, 1000)
                 .getRecords().stream()
                 .filter(uc -> uc.getId().equals(userCouponId))

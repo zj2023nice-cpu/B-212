@@ -11,13 +11,11 @@ import com.milktea.entity.Promotion;
 import com.milktea.mapper.CartItemMapper;
 import com.milktea.mapper.ProductMapper;
 import com.milktea.service.PromotionService;
-import com.milktea.service.UserService;
 import com.milktea.util.PromotionCalculator;
+import com.milktea.util.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -39,27 +37,9 @@ public class PromotionController {
     @Autowired
     private ProductMapper productMapper;
 
-    @Autowired
-    private UserService userService;
-
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
-
-    private boolean isCurrentUserAdmin() {
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
-        return authorities.stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-    }
-
     @PostMapping
     public Result<Promotion> createPromotion(@RequestBody Promotion promotion) {
-        if (!isCurrentUserAdmin()) {
+        if (!SecurityUtils.isCurrentUserAdmin()) {
             return Result.forbidden("仅管理员可创建促销活动");
         }
         Promotion created = promotionService.createPromotion(promotion);
@@ -81,7 +61,7 @@ public class PromotionController {
 
     @PutMapping("/{id}/status")
     public Result<Promotion> updatePromotionStatus(@PathVariable Long id, @RequestParam Integer status) {
-        if (!isCurrentUserAdmin()) {
+        if (!SecurityUtils.isCurrentUserAdmin()) {
             return Result.forbidden("仅管理员可修改促销活动状态");
         }
         Promotion updated = promotionService.updatePromotionStatus(id, status);
@@ -90,7 +70,7 @@ public class PromotionController {
 
     @DeleteMapping("/{id}")
     public Result<String> deletePromotion(@PathVariable Long id) {
-        if (!isCurrentUserAdmin()) {
+        if (!SecurityUtils.isCurrentUserAdmin()) {
             return Result.forbidden("仅管理员可删除促销活动");
         }
         promotionService.removeById(id);
@@ -99,7 +79,7 @@ public class PromotionController {
 
     @GetMapping("/cart-hint")
     public Result<Map<String, Object>> getCartPromotionHint() {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         List<PromotionCalculator.CartItemInfo> cartItems = buildCartItems(userId);
         if (cartItems.isEmpty()) {
             return Result.success(Map.of("hint", "", "hasPromotion", false));
@@ -139,7 +119,7 @@ public class PromotionController {
 
     @PostMapping("/calculate")
     public Result<PromotionCalculateResponse> calculatePromotion(@RequestBody(required = false) PromotionCalculateRequest request) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         List<PromotionCalculator.CartItemInfo> cartItems = buildCartItems(userId);
 
         BigDecimal orderAmount = cartItems.stream()

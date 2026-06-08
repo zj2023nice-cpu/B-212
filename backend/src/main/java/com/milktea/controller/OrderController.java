@@ -2,6 +2,8 @@ package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.milktea.annotation.ResourceOwnerCheck;
+import com.milktea.annotation.ResourceType;
 import com.milktea.common.Result;
 import com.milktea.dto.ReceiptVO;
 import com.milktea.entity.*;
@@ -9,7 +11,6 @@ import com.milktea.enums.DeliveryType;
 import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
-import com.milktea.service.UserService;
 import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
 import com.milktea.service.AddressService;
@@ -17,12 +18,11 @@ import com.milktea.service.NotificationService;
 import com.milktea.service.PromotionService;
 import com.milktea.statemachine.OrderStateMachine;
 import com.milktea.util.PromotionCalculator;
+import com.milktea.util.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +30,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +55,6 @@ public class OrderController {
     private ProductMapper productMapper;
 
     @Autowired
-    private UserService userService;
-
-    @Autowired
     private ProductService productService;
 
     @Autowired
@@ -79,25 +75,10 @@ public class OrderController {
     @Autowired
     private PromotionService promotionService;
 
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
-
-    private boolean isCurrentUserAdmin() {
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
-        return authorities.stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-    }
-
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
     public Result<Order> createOrder(@RequestBody Order orderReq) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         
         List<CartItem> cartItems = cartItemMapper.selectList(new LambdaQueryWrapper<CartItem>().eq(CartItem::getUserId, userId));
         if (cartItems.isEmpty()) {
@@ -310,7 +291,7 @@ public class OrderController {
             @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String orderSn,
             @RequestParam(required = false) String productName) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         Page<Order> pageParam = new Page<>(page, pageSize);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getUserId, userId);
@@ -340,19 +321,19 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @ResourceOwnerCheck(resourceType = ResourceType.ORDER, idParam = "id",
+            notFoundMessage = "Order not found",
+            notAuthorizedMessage = "Not authorized to view this order")
     public Result<Order> getOrderDetail(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserId();
-        boolean isAdmin = isCurrentUserAdmin();
         Order order = orderMapper.selectById(id);
-        
         if (order == null) {
             return Result.error("Order not found");
         }
-        
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
         if (!isAdmin && !order.getUserId().equals(currentUserId)) {
             return Result.error("Not authorized to view this order");
         }
-        
         return Result.success(order);
     }
 
@@ -394,32 +375,33 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/items")
+    @ResourceOwnerCheck(resourceType = ResourceType.ORDER, idParam = "id",
+            notFoundMessage = "Order not found",
+            notAuthorizedMessage = "Not authorized to view this order's items")
     public Result<List<OrderItem>> getOrderItems(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserId();
-        boolean isAdmin = isCurrentUserAdmin();
         Order order = orderMapper.selectById(id);
-        
         if (order == null) {
             return Result.error("Order not found");
         }
-        
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
         if (!isAdmin && !order.getUserId().equals(currentUserId)) {
             return Result.error("Not authorized to view this order's items");
         }
-        
         return Result.success(orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id)));
     }
 
     @GetMapping("/{id}/receipt")
+    @ResourceOwnerCheck(resourceType = ResourceType.ORDER, idParam = "id",
+            notFoundMessage = "Order not found",
+            notAuthorizedMessage = "Not authorized to view this receipt")
     public Result<ReceiptVO> getReceipt(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserId();
-        boolean isAdmin = isCurrentUserAdmin();
         Order order = orderMapper.selectById(id);
-
         if (order == null) {
             return Result.error("Order not found");
         }
-
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
         if (!isAdmin && !order.getUserId().equals(currentUserId)) {
             return Result.error("Not authorized to view this receipt");
         }
@@ -485,20 +467,21 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
+    @ResourceOwnerCheck(resourceType = ResourceType.ORDER, idParam = "id",
+            notFoundMessage = "Order not found",
+            notAuthorizedMessage = "Not authorized to update this order")
     @Transactional(rollbackFor = Exception.class)
     public Result<String> updateStatus(@PathVariable Long id, @RequestParam String status) {
-        Long currentUserId = getCurrentUserId();
-        boolean isAdmin = isCurrentUserAdmin();
+        boolean isAdmin = SecurityUtils.isCurrentUserAdmin();
         Order existingOrder = orderMapper.selectById(id);
-        
         if (existingOrder == null) {
             return Result.error("Order not found");
         }
-        
+        Long currentUserId = SecurityUtils.getCurrentUserId();
         if (!isAdmin && !existingOrder.getUserId().equals(currentUserId)) {
             return Result.error("Not authorized to update this order");
         }
-
+        
         OrderStatus targetStatus;
         try {
             targetStatus = OrderStatus.valueOf(status);
@@ -555,7 +538,8 @@ public class OrderController {
                         logger.warn("积分扣减失败，不影响取消订单: orderId={}, reason={}", id, e.getMessage());
                     }
                 }
-                String cancelReason = "用户主动取消";
+                String cancelReason = isAdmin ? "管理员取消" : "用户主动取消";
+                String operator = isAdmin ? "ADMIN" : "USER";
                 Order orderToUpdate = new Order();
                 orderToUpdate.setId(id);
                 orderToUpdate.setStatus(targetStatus);
@@ -565,7 +549,7 @@ public class OrderController {
                 OrderCancelLog cancelLog = new OrderCancelLog();
                 cancelLog.setOrderId(id);
                 cancelLog.setCancelReason(cancelReason);
-                cancelLog.setOperator("USER");
+                cancelLog.setOperator(operator);
                 orderCancelLogMapper.insert(cancelLog);
 
                 try {
@@ -576,7 +560,7 @@ public class OrderController {
                     logger.warn("发送订单取消通知失败: orderId={}, reason={}", id, e2.getMessage());
                 }
 
-                logger.info("订单已取消，所有商品库存已恢复: orderId={}, cancelReason={}", id, cancelReason);
+                logger.info("订单已取消，所有商品库存已恢复: orderId={}, cancelReason={}, operator={}", id, cancelReason, operator);
                 return Result.success("Status updated");
             } catch (Exception e) {
                 logger.error("取消订单失败: orderId={}, 原因={}", id, e.getMessage());

@@ -14,12 +14,12 @@ import com.milktea.mapper.FeedbackMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
 import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,15 +53,6 @@ public class FeedbackController {
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
-
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
 
     private Map<Long, User> batchGetUsers(List<Feedback> feedbacks) {
         Set<Long> userIds = feedbacks.stream()
@@ -147,7 +138,7 @@ public class FeedbackController {
             return Result.error("评价列表不能为空");
         }
 
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         Long orderId = feedbacks.get(0).getOrderId();
         if (orderId == null) {
             return Result.error("订单ID不能为空");
@@ -242,7 +233,7 @@ public class FeedbackController {
 
     @GetMapping("/order/{orderId}")
     public Result<List<FeedbackVO>> getOrderFeedbacks(@PathVariable Long orderId) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
             return Result.error("Order not found");

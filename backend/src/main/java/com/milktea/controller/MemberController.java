@@ -5,9 +5,8 @@ import com.milktea.common.Result;
 import com.milktea.entity.MemberLevel;
 import com.milktea.entity.PointsRecord;
 import com.milktea.service.MemberService;
-import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -43,21 +42,9 @@ public class MemberController {
     @Autowired
     private MemberService memberService;
 
-    @Autowired
-    private UserService userService;
-
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
-
     @GetMapping("/level")
     public Result<Map<String, Object>> getMemberLevel() {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         MemberLevel memberLevel = memberService.getOrCreateMemberLevel(userId);
 
         Map<String, Object> data = new HashMap<>();
@@ -87,13 +74,13 @@ public class MemberController {
     public Result<Page<PointsRecord>> getPointsRecords(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         return Result.success(memberService.getPointsRecords(userId, page, pageSize));
     }
 
     @GetMapping("/discount")
     public Result<Map<String, Object>> calculateDiscount(@RequestParam BigDecimal amount) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         BigDecimal discountRate = memberService.getDiscountRate(userId);
         BigDecimal discountAmount = memberService.calculateDiscount(userId, amount);
 

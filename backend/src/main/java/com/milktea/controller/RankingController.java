@@ -3,10 +3,8 @@ package com.milktea.controller;
 import com.milktea.common.Result;
 import com.milktea.dto.HotProductVO;
 import com.milktea.service.RankingService;
-import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,9 +15,6 @@ public class RankingController {
 
     @Autowired
     private RankingService rankingService;
-
-    @Autowired
-    private UserService userService;
 
     @GetMapping("/hot")
     public Result<List<HotProductVO>> getHotRanking(
@@ -41,27 +36,7 @@ public class RankingController {
         if (limit < 1 || limit > 50) {
             limit = 6;
         }
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserIdOrNull();
         return Result.success(rankingService.getRecommendation(userId, limit));
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-        Object details = authentication.getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = authentication.getName();
-        if ("anonymousUser".equals(username)) {
-            return null;
-        }
-        try {
-            return userService.getByUsername(username).getId();
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

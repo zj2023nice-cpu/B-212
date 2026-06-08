@@ -6,9 +6,8 @@ import com.milktea.entity.Favorite;
 import com.milktea.entity.Product;
 import com.milktea.mapper.ProductMapper;
 import com.milktea.service.FavoriteService;
-import com.milktea.service.UserService;
+import com.milktea.util.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -23,19 +22,7 @@ public class FavoriteController {
     private FavoriteService favoriteService;
 
     @Autowired
-    private UserService userService;
-
-    @Autowired
     private ProductMapper productMapper;
-
-    private Long getCurrentUserId() {
-        Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (details instanceof Long) {
-            return (Long) details;
-        }
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userService.getByUsername(username).getId();
-    }
 
     @PostMapping
     public Result<Favorite> addFavorite(@RequestBody Map<String, Long> params) {
@@ -43,14 +30,14 @@ public class FavoriteController {
         if (productId == null) {
             return Result.badRequest("商品ID不能为空");
         }
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         Favorite favorite = favoriteService.addFavorite(userId, productId);
         return Result.success(favorite);
     }
 
     @DeleteMapping("/{productId}")
     public Result<String> removeFavorite(@PathVariable Long productId) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         favoriteService.removeFavorite(userId, productId);
         return Result.success("取消收藏成功");
     }
@@ -59,7 +46,7 @@ public class FavoriteController {
     public Result<Map<String, Object>> getFavoriteList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "12") Integer pageSize) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         Page<Favorite> favoritePage = favoriteService.getFavoriteList(userId, page, pageSize);
 
         List<Map<String, Object>> productList = favoritePage.getRecords().stream().map(fav -> {
@@ -88,7 +75,7 @@ public class FavoriteController {
 
     @GetMapping("/check")
     public Result<Map<String, Object>> checkFavorite(@RequestParam Long productId) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         boolean favorited = favoriteService.isFavorite(userId, productId);
         Map<String, Object> result = new HashMap<>();
         result.put("favorited", favorited);
@@ -97,7 +84,7 @@ public class FavoriteController {
 
     @PostMapping("/batch-check")
     public Result<Map<Long, Boolean>> batchCheckFavorite(@RequestBody List<Long> productIds) {
-        Long userId = getCurrentUserId();
+        Long userId = SecurityUtils.getCurrentUserId();
         List<Long> favoriteIds = favoriteService.getFavoriteProductIds(userId, productIds);
         Map<Long, Boolean> result = new HashMap<>();
         for (Long pid : productIds) {
