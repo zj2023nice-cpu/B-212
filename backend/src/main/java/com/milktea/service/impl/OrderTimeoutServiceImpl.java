@@ -108,6 +108,7 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
 
         int successCount = 0;
         int failCount = 0;
+        StringBuilder failDetails = new StringBuilder();
 
         for (OrderItem item : orderItems) {
             boolean restored = productService.restoreStock(item.getProductId(), item.getQuantity());
@@ -115,13 +116,21 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
                 successCount++;
             } else {
                 failCount++;
-                logger.error("超时取消-库存恢复失败: orderId={}, productId={}, productName={}, quantity={}", 
-                        orderId, item.getProductId(), item.getProductName(), item.getQuantity());
+                String detail = String.format("productId=%d, productName=%s, quantity=%d",
+                        item.getProductId(), item.getProductName(), item.getQuantity());
+                failDetails.append(failDetails.length() > 0 ? "; " : "").append(detail);
+                logger.error("超时取消-库存恢复失败: orderId={}, {}", orderId, detail);
             }
         }
 
-        logger.info("超时取消-库存恢复完成: orderId={}, 总商品数={}, 成功={}, 失败={}", 
+        logger.info("超时取消-库存恢复完成: orderId={}, 总商品数={}, 成功={}, 失败={}",
                 orderId, orderItems.size(), successCount, failCount);
+
+        if (failCount > 0) {
+            String errorMsg = String.format("库存恢复失败，订单取消回滚: orderId=%d, 失败%d个商品, 详情: %s",
+                    orderId, failCount, failDetails.toString());
+            throw new RuntimeException(errorMsg);
+        }
     }
 
     private void recordCancelLog(Long orderId, String cancelReason, String operator) {
