@@ -3,6 +3,7 @@ package com.milktea.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.milktea.enums.DeliveryType;
 import com.milktea.enums.OrderStatus;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -26,6 +27,9 @@ public class Order {
     private String addressContactName;
     private String addressPhone;
     private String addressFull;
+    private DeliveryType deliveryType;
+    private String pickupStore;
+    private LocalDateTime pickupTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -58,6 +58,8 @@
           <el-tag :type="getStatusType(order.status)" effect="light" round>
             {{ getStatusText(order.status) }}
           </el-tag>
+          <el-tag v-if="order.deliveryType === 'SELF_PICKUP'" type="warning" effect="light" size="small" round class="ml-1">自提</el-tag>
+          <el-tag v-else-if="order.deliveryType === 'DELIVERY'" effect="light" size="small" round class="ml-1">配送</el-tag>
         </div>
 
         <div class="flex items-center justify-between">

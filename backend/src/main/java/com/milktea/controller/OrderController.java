@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.common.Result;
 import com.milktea.entity.*;
+import com.milktea.enums.DeliveryType;
 import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
@@ -23,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -166,7 +169,16 @@ public class OrderController {
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setRemark(orderReq.getRemark());
 
-        if (orderReq.getAddressId() != null) {
+        DeliveryType deliveryType = orderReq.getDeliveryType();
+        if (deliveryType == null) {
+            deliveryType = DeliveryType.DELIVERY;
+        }
+        order.setDeliveryType(deliveryType);
+
+        if (deliveryType == DeliveryType.DELIVERY) {
+            if (orderReq.getAddressId() == null) {
+                return Result.error("外卖配送请选择收货地址");
+            }
             try {
                 Address address = addressService.getByIdAndUserId(orderReq.getAddressId(), userId);
                 order.setAddressId(address.getId());
@@ -174,8 +186,28 @@ public class OrderController {
                 order.setAddressPhone(address.getPhone());
                 order.setAddressFull(address.getProvince() + address.getCity() + address.getDistrict() + address.getDetailAddress());
             } catch (Exception e) {
-                logger.warn("地址信息获取失败，订单将不带地址信息: addressId={}, reason={}", orderReq.getAddressId(), e.getMessage());
+                logger.warn("地址信息获取失败: addressId={}, reason={}", orderReq.getAddressId(), e.getMessage());
+                return Result.error("收货地址信息获取失败，请重新选择");
             }
+        } else if (deliveryType == DeliveryType.SELF_PICKUP) {
+            if (orderReq.getPickupStore() == null || orderReq.getPickupStore().trim().isEmpty()) {
+                return Result.error("门店自提请选择自提门店");
+            }
+            if (orderReq.getPickupTime() == null) {
+                return Result.error("门店自提请选择预计自提时间");
+            }
+            LocalTime businessStart = LocalTime.of(9, 0);
+            LocalTime businessEnd = LocalTime.of(22, 0);
+            LocalTime pickupLocalTime = orderReq.getPickupTime().toLocalTime();
+            if (pickupLocalTime.isBefore(businessStart) || !pickupLocalTime.isBefore(businessEnd)) {
+                return Result.error("自提时间需在营业时间 09:00-22:00 内");
+            }
+            LocalDateTime minPickupTime = LocalDateTime.now().plusMinutes(30);
+            if (orderReq.getPickupTime().isBefore(minPickupTime)) {
+                return Result.error("自提时间需在当前时间30分钟之后");
+            }
+            order.setPickupStore(orderReq.getPickupStore().trim());
+            order.setPickupTime(orderReq.getPickupTime());
         }
 
         orderMapper.insert(order);

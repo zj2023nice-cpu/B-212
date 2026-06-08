@@ -21,13 +21,25 @@
           <el-step title="待支付" />
           <el-step title="已支付" />
           <el-step title="制作中" />
-          <el-step title="配送中" />
-          <el-step title="已送达" />
+          <el-step :title="order?.deliveryType === 'SELF_PICKUP' ? '待自提' : '配送中'" />
+          <el-step :title="order?.deliveryType === 'SELF_PICKUP' ? '已自提' : '已送达'" />
         </el-steps>
       </div>
 
-      <div v-if="order?.addressFull" class="p-8 border-t">
-        <h4 class="font-bold mb-3">收货信息</h4>
+      <div v-if="order?.deliveryType === 'SELF_PICKUP'" class="p-8 border-t">
+        <h4 class="font-bold mb-3">自提信息</h4>
+        <div class="flex items-center gap-2 text-sm mb-2">
+          <el-icon class="text-primary"><Shop /></el-icon>
+          <span class="font-medium text-gray-800">{{ order.pickupStore }}</span>
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <el-icon class="text-primary"><Clock /></el-icon>
+          <span>预计自提时间：{{ formatPickupTime(order.pickupTime) }}</span>
+        </div>
+      </div>
+
+      <div v-else-if="order?.addressFull" class="p-8 border-t">
+        <h4 class="font-bold mb-3">配送信息</h4>
         <div class="flex items-center gap-4 text-sm">
           <span class="text-gray-600"><span class="font-medium text-gray-800">{{ order.addressContactName }}</span></span>
           <span class="text-gray-600">{{ order.addressPhone }}</span>
@@ -161,7 +173,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOrderDetail, getOrderItems, updateOrderStatus, submitFeedback } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning, EditPen, CircleCheck } from '@element-plus/icons-vue'
+import { Warning, EditPen, CircleCheck, Shop, Clock } from '@element-plus/icons-vue'
 import ReviewForm from '@/components/ReviewForm.vue'
 
 const route = useRoute()
@@ -230,6 +242,12 @@ const formatSpecs = specsStr => {
   } catch (e) {
     return specsStr
   }
+}
+
+const formatPickupTime = timeStr => {
+  if (!timeStr) return ''
+  const d = new Date(timeStr)
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 const fetchData = async () => {

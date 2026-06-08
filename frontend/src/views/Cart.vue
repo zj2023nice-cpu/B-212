@@ -42,17 +42,45 @@
 
     <el-dialog v-model="checkoutVisible" title="确认订单" width="500px">
       <el-form label-position="top">
-        <el-form-item label="收货地址">
-          <div v-if="selectedAddress" class="w-full border rounded-lg p-3 cursor-pointer hover:border-primary transition-all" @click="addressDialogVisible = true">
-            <div class="flex items-center gap-2">
-              <span class="font-bold">{{ selectedAddress.contactName }}</span>
-              <span class="text-gray-500">{{ selectedAddress.phone }}</span>
-              <el-tag v-if="selectedAddress.isDefault === 1" size="small" type="danger">默认</el-tag>
-            </div>
-            <div class="text-sm text-gray-600 mt-1">{{ selectedAddress.province }}{{ selectedAddress.city }}{{ selectedAddress.district }}{{ selectedAddress.detailAddress }}</div>
-          </div>
-          <el-button v-else type="primary" plain class="w-full" @click="addressDialogVisible = true">选择收货地址</el-button>
+        <el-form-item label="配送方式">
+          <el-radio-group v-model="deliveryType">
+            <el-radio value="DELIVERY">外卖配送</el-radio>
+            <el-radio value="SELF_PICKUP">门店自提</el-radio>
+          </el-radio-group>
         </el-form-item>
+
+        <template v-if="deliveryType === 'DELIVERY'">
+          <el-form-item label="收货地址">
+            <div v-if="selectedAddress" class="w-full border rounded-lg p-3 cursor-pointer hover:border-primary transition-all" @click="addressDialogVisible = true">
+              <div class="flex items-center gap-2">
+                <span class="font-bold">{{ selectedAddress.contactName }}</span>
+                <span class="text-gray-500">{{ selectedAddress.phone }}</span>
+                <el-tag v-if="selectedAddress.isDefault === 1" size="small" type="danger">默认</el-tag>
+              </div>
+              <div class="text-sm text-gray-600 mt-1">{{ selectedAddress.province }}{{ selectedAddress.city }}{{ selectedAddress.district }}{{ selectedAddress.detailAddress }}</div>
+            </div>
+            <el-button v-else type="primary" plain class="w-full" @click="addressDialogVisible = true">选择收货地址</el-button>
+          </el-form-item>
+        </template>
+
+        <template v-if="deliveryType === 'SELF_PICKUP'">
+          <el-form-item label="自提门店">
+            <el-select v-model="pickupStore" placeholder="请选择自提门店" style="width: 100%">
+              <el-option v-for="store in pickupStores" :key="store" :label="store" :value="store" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="预计自提时间">
+            <el-time-select
+              v-model="pickupTime"
+              :start="minPickupTimeStr"
+              step="00:30"
+              end="22:00"
+              placeholder="选择自提时间"
+              style="width: 100%"
+            />
+            <div class="text-xs text-gray-400 mt-1">营业时间 09:00-22:00，需选择当前时间30分钟后</div>
+          </el-form-item>
+        </template>
         <el-form-item label="选择优惠券">
           <el-select
             v-model="selectedCouponId"
@@ -127,6 +155,15 @@ const memberDiscountRate = ref(0)
 const memberLevelName = ref('普通会员')
 const addressDialogVisible = ref(false)
 const selectedAddress = ref(null)
+const deliveryType = ref('DELIVERY')
+const pickupStore = ref(null)
+const pickupTime = ref(null)
+const pickupStores = [
+  '奶茶总店（中山路88号）',
+  '城西分店（西湖大道12号）',
+  '城南分店（解放路56号）',
+  '大学城店（学府路168号）'
+]
 
 const totalPrice = computed(() => {
   return cartStore.groups.reduce((sum, g) => sum + (g.specs || []).reduce((s, item) => s + (Number(item.unitPrice) || 0) * item.quantity, 0), 0).toFixed(2)
@@ -135,6 +172,18 @@ const totalPrice = computed(() => {
 const finalPrice = computed(() => {
   const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - memberDiscountAmount.value)
   return val.toFixed(2)
+})
+
+const minPickupTimeStr = computed(() => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 30)
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = now.getMinutes() <= 30 ? '30' : '00'
+  const startHour = parseInt(hours + minutes === '00' ? String(parseInt(hours) + 1) : hours, 10)
+  const effectiveHour = minutes === '00' && now.getMinutes() > 30 ? startHour + 1 : startHour
+  const effectiveMin = minutes === '00' && now.getMinutes() > 30 ? '00' : minutes
+  const h = String(Math.max(9, effectiveHour)).padStart(2, '0')
+  return h + ':' + effectiveMin
 })
 
 const formatSpecs = (specsStr) => {
@@ -184,6 +233,9 @@ const fetchMemberDiscount = async (baseAmount) => {
 const handleCheckout = async () => {
   selectedCouponId.value = null
   discountAmount.value = 0
+  deliveryType.value = 'DELIVERY'
+  pickupStore.value = null
+  pickupTime.value = null
   checkoutVisible.value = true
   try {
     await addressStore.fetchAddresses()
@@ -245,14 +297,41 @@ const handleAddressSelect = (addr) => {
 }
 
 const confirmOrder = async () => {
+  if (deliveryType.value === 'DELIVERY' && !selectedAddress.value) {
+    ElMessage.warning('请选择收货地址')
+    return
+  }
+  if (deliveryType.value === 'SELF_PICKUP') {
+    if (!pickupStore.value) {
+      ElMessage.warning('请选择自提门店')
+      return
+    }
+    if (!pickupTime.value) {
+      ElMessage.warning('请选择预计自提时间')
+      return
+    }
+  }
   submitting.value = true
   try {
-    await createOrder({
+    const orderData = {
       totalAmount: totalPrice.value,
       remark: remark.value,
       userCouponId: selectedCouponId.value || undefined,
-      addressId: selectedAddress.value?.id || undefined
-    })
+      deliveryType: deliveryType.value
+    }
+    if (deliveryType.value === 'DELIVERY') {
+      orderData.addressId = selectedAddress.value?.id || undefined
+    } else {
+      orderData.pickupStore = pickupStore.value
+      const today = new Date()
+      const [h, m] = pickupTime.value.split(':').map(Number)
+      const pickupDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0)
+      if (pickupDate <= new Date(Date.now() + 30 * 60 * 1000)) {
+        pickupDate.setDate(pickupDate.getDate() + 1)
+      }
+      orderData.pickupTime = pickupDate.toISOString()
+    }
+    await createOrder(orderData)
     ElMessage.success('支付成功，订单已下达')
     await cartStore.fetchCart()
     router.push('/orders')
