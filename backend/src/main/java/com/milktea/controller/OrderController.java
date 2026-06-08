@@ -307,6 +307,8 @@ public class OrderController {
             }
         }
 
+        boolean notificationSent = false;
+
         if (status == 1 && currentStatus == 0) {
             Order refreshed = orderMapper.selectById(id);
             if (refreshed.getStatus() != 0) {
@@ -322,6 +324,7 @@ public class OrderController {
                 notificationService.sendNotification(existingOrder.getUserId(), "订单已支付",
                         "您的订单 " + existingOrder.getOrderSn() + " 已支付成功，正在制作中",
                         "ORDER", id);
+                notificationSent = true;
             } catch (Exception e) {
                 logger.warn("发送订单支付通知失败: orderId={}, reason={}", id, e.getMessage());
             }
@@ -371,13 +374,15 @@ public class OrderController {
         order.setStatus(status);
         orderMapper.updateById(order);
 
-        try {
-            String statusText = getOrderStatusText(status);
-            notificationService.sendNotification(existingOrder.getUserId(), "订单状态变更",
-                    "您的订单 " + existingOrder.getOrderSn() + " 状态已更新为：" + statusText,
-                    "ORDER", id);
-        } catch (Exception e) {
-            logger.warn("发送订单状态变更通知失败: orderId={}, reason={}", id, e.getMessage());
+        if (!notificationSent) {
+            try {
+                String statusText = getOrderStatusText(status);
+                notificationService.sendNotification(existingOrder.getUserId(), "订单状态变更",
+                        "您的订单 " + existingOrder.getOrderSn() + " 状态已更新为：" + statusText,
+                        "ORDER", id);
+            } catch (Exception e) {
+                logger.warn("发送订单状态变更通知失败: orderId={}, reason={}", id, e.getMessage());
+            }
         }
 
         return Result.success("Status updated");

@@ -68,9 +68,7 @@ public class NotificationController {
     @PutMapping("/batch-read")
     public Result<String> batchMarkAsRead(@RequestBody List<Long> ids) {
         Long userId = getCurrentUserId();
-        for (Long id : ids) {
-            notificationService.markAsRead(id, userId);
-        }
+        notificationService.markAsReadBatch(ids, userId);
         return Result.success("Batch marked as read");
     }
 

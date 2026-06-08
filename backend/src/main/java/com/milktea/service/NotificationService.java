@@ -12,6 +12,7 @@ public interface NotificationService extends IService<Notification> {
     List<Notification> getRecentNotifications(Long userId, Integer limit);
     Long getUnreadCount(Long userId);
     void markAsRead(Long notificationId, Long userId);
+    void markAsReadBatch(List<Long> ids, Long userId);
     void markAllAsRead(Long userId);
     void deleteNotification(Long notificationId, Long userId);
 }

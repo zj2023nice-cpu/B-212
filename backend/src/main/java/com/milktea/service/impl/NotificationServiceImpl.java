@@ -69,6 +69,18 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
     }
 
     @Override
+    public void markAsReadBatch(List<Long> ids, Long userId) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        LambdaUpdateWrapper<Notification> updateWrapper = new LambdaUpdateWrapper<Notification>()
+                .in(Notification::getId, ids)
+                .eq(Notification::getUserId, userId)
+                .set(Notification::getIsRead, 1);
+        update(updateWrapper);
+    }
+
+    @Override
     public void markAllAsRead(Long userId) {
         LambdaUpdateWrapper<Notification> updateWrapper = new LambdaUpdateWrapper<Notification>()
                 .eq(Notification::getUserId, userId)
