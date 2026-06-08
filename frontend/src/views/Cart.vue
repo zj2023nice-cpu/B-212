@@ -51,14 +51,18 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="discountAmount > 0" label="">
+        <el-form-item v-if="discountAmount > 0 || memberDiscountAmount > 0" label="">
           <div class="w-full flex items-center justify-between text-sm">
             <span class="text-gray-500">商品总额</span>
             <span>¥{{ totalPrice }}</span>
           </div>
-          <div class="w-full flex items-center justify-between text-sm mt-2">
+          <div v-if="discountAmount > 0" class="w-full flex items-center justify-between text-sm mt-2">
             <span class="text-gray-500">优惠券减免</span>
             <span class="text-red-500">-¥{{ discountAmount }}</span>
+          </div>
+          <div v-if="memberDiscountAmount > 0" class="w-full flex items-center justify-between text-sm mt-2">
+            <span class="text-gray-500">会员折扣({{ memberLevelName }} {{ (memberDiscountRate * 100).toFixed(0) }}%)</span>
+            <span class="text-red-500">-¥{{ memberDiscountAmount }}</span>
           </div>
           <el-divider class="my-3" />
           <div class="w-full flex items-center justify-between">
@@ -83,7 +87,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useCartStore } from '@/store/cart'
-import { getProducts, updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon } from '@/api'
+import { getProducts, updateCartItem, removeCartItem, createOrder, getAvailableCoupons, applyCoupon, getMemberDiscount } from '@/api'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -96,6 +100,9 @@ const submitting = ref(false)
 const availableCoupons = ref([])
 const selectedCouponId = ref(null)
 const discountAmount = ref(0)
+const memberDiscountAmount = ref(0)
+const memberDiscountRate = ref(0)
+const memberLevelName = ref('普通会员')
 
 const cartItemsWithProduct = computed(() => {
   return cartStore.items.map(item => ({
@@ -109,7 +116,7 @@ const totalPrice = computed(() => {
 })
 
 const finalPrice = computed(() => {
-  const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value)
+  const val = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value - memberDiscountAmount.value)
   return val.toFixed(2)
 })
 
@@ -138,6 +145,20 @@ const handleRemove = async (id) => {
   await cartStore.fetchCart()
 }
 
+const fetchMemberDiscount = async (baseAmount) => {
+  try {
+    const memberData = await getMemberDiscount({ amount: baseAmount })
+    memberDiscountAmount.value = parseFloat(memberData.discountAmount) || 0
+    memberDiscountRate.value = parseFloat(memberData.discountRate) || 0
+    const rateToName = { 0: '普通会员', '0.05': '银卡会员', '0.10': '金卡会员', '0.15': '黑卡会员' }
+    memberLevelName.value = rateToName[String(memberData.discountRate)] || '普通会员'
+  } catch (e) {
+    memberDiscountAmount.value = 0
+    memberDiscountRate.value = 0
+    memberLevelName.value = '普通会员'
+  }
+}
+
 const handleCheckout = async () => {
   selectedCouponId.value = null
   discountAmount.value = 0
@@ -163,11 +184,13 @@ const handleCheckout = async () => {
   } catch (e) {
     availableCoupons.value = []
   }
+  await fetchMemberDiscount(parseFloat(totalPrice.value))
 }
 
 const handleCouponChange = async (val) => {
   if (!val) {
     discountAmount.value = 0
+    await fetchMemberDiscount(parseFloat(totalPrice.value))
     return
   }
   try {
@@ -176,9 +199,12 @@ const handleCouponChange = async (val) => {
       orderAmount: parseFloat(totalPrice.value)
     })
     discountAmount.value = parseFloat(data.discount) || 0
+    const afterCoupon = Math.max(0, parseFloat(totalPrice.value) - discountAmount.value)
+    await fetchMemberDiscount(afterCoupon)
   } catch (e) {
     discountAmount.value = 0
     selectedCouponId.value = null
+    await fetchMemberDiscount(parseFloat(totalPrice.value))
   }
 }
 

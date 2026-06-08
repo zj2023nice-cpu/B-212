@@ -8,6 +8,7 @@ import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
 import com.milktea.service.CouponService;
+import com.milktea.service.MemberService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ public class OrderController {
 
     @Autowired
     private CouponService couponService;
+
+    @Autowired
+    private MemberService memberService;
 
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -118,6 +122,10 @@ public class OrderController {
             }
         }
 
+        BigDecimal afterCouponAmount = totalAmount.subtract(discountAmount);
+        BigDecimal memberDiscountAmount = memberService.calculateDiscount(userId, afterCouponAmount);
+        discountAmount = discountAmount.add(memberDiscountAmount);
+
         BigDecimal payAmount = totalAmount.subtract(discountAmount);
 
         Order order = new Order();
@@ -165,9 +173,15 @@ public class OrderController {
             orderMapper.updateById(order);
         }
 
-        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}", 
+        try {
+            memberService.earnPoints(userId, order.getId(), order.getPayAmount());
+        } catch (Exception e) {
+            logger.warn("积分发放失败，不影响订单: userId={}, orderId={}, reason={}", userId, order.getId(), e.getMessage());
+        }
+
+        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}, memberDiscount={}", 
                 order.getId(), userId, totalAmount, couponRedeemed ? discountAmount : BigDecimal.ZERO, 
-                couponRedeemed ? payAmount : totalAmount, couponRedeemed);
+                couponRedeemed ? payAmount : totalAmount, couponRedeemed, memberDiscountAmount);
         return Result.success(order);
     }
 
@@ -263,6 +277,11 @@ public class OrderController {
         if (status == 3 && currentStatus != 3) {
             try {
                 restoreOrderStock(id);
+                try {
+                    memberService.deductPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
+                } catch (Exception e) {
+                    logger.warn("积分扣减失败，不影响取消订单: orderId={}, reason={}", id, e.getMessage());
+                }
                 logger.info("订单已取消，所有商品库存已恢复: orderId={}", id);
             } catch (Exception e) {
                 logger.error("取消订单失败: orderId={}, 原因={}", id, e.getMessage());

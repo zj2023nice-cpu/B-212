@@ -24,6 +24,7 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item @click="$router.push('/member')">会员中心</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/orders')">我的订单</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/coupons')">领券中心</el-dropdown-item>
                 <el-dropdown-item @click="$router.push('/my-coupons')">我的优惠券</el-dropdown-item>

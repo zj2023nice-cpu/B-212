@@ -135,3 +135,28 @@ CREATE TABLE `user_coupons` (
     FOREIGN KEY (coupon_id) REFERENCES coupons(id),
     UNIQUE KEY `uk_user_coupon` (`user_id`, `coupon_id`)
 ) ENGINE=InnoDB COMMENT='用户优惠券表';
+
+-- 10. 会员等级表
+CREATE TABLE `member_levels` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL UNIQUE COMMENT '用户ID',
+    `level` TINYINT NOT NULL DEFAULT 0 COMMENT '等级: 0-普通, 1-银卡, 2-金卡, 3-黑卡',
+    `total_points` INT NOT NULL DEFAULT 0 COMMENT '累计总积分',
+    `current_points` INT NOT NULL DEFAULT 0 COMMENT '当前可用积分',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='会员等级表';
+
+-- 11. 积分记录表
+CREATE TABLE `points_records` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `order_id` BIGINT COMMENT '关联订单ID',
+    `points` INT NOT NULL COMMENT '积分变动值(正数增加,负数扣减)',
+    `type` TINYINT NOT NULL COMMENT '类型: 1-消费获得, 2-管理员调整, 3-订单取消扣减',
+    `description` VARCHAR(255) COMMENT '描述',
+    `balance` INT NOT NULL COMMENT '变动后余额',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='积分记录表';

@@ -28,3 +28,7 @@ export const claimCoupon = (id) => request.post(`/coupons/${id}/claim`)
 export const getMyCoupons = (params) => request.get('/coupons/mine', { params })
 export const getAvailableCoupons = (params) => request.get('/coupons/available', { params })
 export const applyCoupon = (data) => request.post('/coupons/apply', data)
+
+export const getMemberLevel = () => request.get('/member/level')
+export const getPointsRecords = (params) => request.get('/member/points', { params })
+export const getMemberDiscount = (params) => request.get('/member/discount', { params })
