@@ -220,11 +220,39 @@ public class OrderController {
     @GetMapping
     public Result<Page<Order>> getMyOrders(
             @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer pageSize) {
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String orderSn,
+            @RequestParam(required = false) String productName) {
+        Long userId = getCurrentUserId();
         Page<Order> pageParam = new Page<>(page, pageSize);
-        return Result.success(orderMapper.selectPage(pageParam, new LambdaQueryWrapper<Order>()
-                .eq(Order::getUserId, getCurrentUserId())
-                .orderByDesc(Order::getCreateTime)));
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getUserId, userId);
+        if (status != null && !status.isEmpty()) {
+            try {
+                OrderStatus orderStatus = OrderStatus.valueOf(status);
+                wrapper.eq(Order::getStatus, orderStatus);
+            } catch (IllegalArgumentException e) {
+                return Result.error("Invalid order status");
+            }
+        }
+        if (startDate != null && !startDate.isEmpty()) {
+            wrapper.ge(Order::getCreateTime, java.time.LocalDate.parse(startDate).atStartOfDay());
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            wrapper.le(Order::getCreateTime, java.time.LocalDate.parse(endDate).atTime(java.time.LocalTime.MAX));
+        }
+        if (orderSn != null && !orderSn.isEmpty()) {
+            wrapper.like(Order::getOrderSn, orderSn);
+        }
+        if (productName != null && !productName.isEmpty()) {
+            wrapper.exists("SELECT 1 FROM order_items WHERE order_items.order_id = orders.id AND product_name LIKE {0}",
+                    "%" + productName + "%");
+        }
+        wrapper.orderByDesc(Order::getCreateTime);
+        return Result.success(orderMapper.selectPage(pageParam, wrapper));
     }
 
     @GetMapping("/{id}")

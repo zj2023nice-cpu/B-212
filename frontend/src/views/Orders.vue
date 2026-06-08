@@ -7,7 +7,7 @@
       </el-button>
     </div>
 
-    <div v-if="isAdmin" class="mb-4 flex flex-wrap gap-3 items-center">
+    <div class="mb-4 flex flex-wrap gap-3 items-center">
       <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 160px" @change="handleFilterChange">
         <el-option label="待支付" value="PENDING_PAYMENT" />
         <el-option label="已支付" value="PAID" />
@@ -26,6 +26,22 @@
         value-format="YYYY-MM-DD"
         style="width: 260px"
         @change="handleFilterChange"
+      />
+      <el-input
+        v-model="filterOrderSn"
+        placeholder="订单编号"
+        clearable
+        style="width: 180px"
+        @clear="handleFilterChange"
+        @keyup.enter="handleFilterChange"
+      />
+      <el-input
+        v-model="filterProductName"
+        placeholder="商品名称"
+        clearable
+        style="width: 180px"
+        @clear="handleFilterChange"
+        @keyup.enter="handleFilterChange"
       />
       <el-button type="primary" plain @click="resetFilters">重置筛选</el-button>
     </div>
@@ -175,6 +191,8 @@ const isAdmin = computed(() => user.value?.role === 'ADMIN')
 
 const filterStatus = ref(null)
 const filterDateRange = ref(null)
+const filterOrderSn = ref('')
+const filterProductName = ref('')
 
 const exportVisible = ref(false)
 const exportDateRange = ref(null)
@@ -237,28 +255,41 @@ const handleFilterChange = () => {
 const resetFilters = () => {
   filterStatus.value = null
   filterDateRange.value = null
+  filterOrderSn.value = ''
+  filterProductName.value = ''
   currentPage.value = 1
   fetchOrders()
 }
 
+const buildFilterParams = () => {
+  const params = {
+    page: currentPage.value,
+    pageSize: pageSize.value
+  }
+  if (filterStatus.value !== null && filterStatus.value !== undefined) {
+    params.status = filterStatus.value
+  }
+  if (filterDateRange.value && filterDateRange.value.length === 2) {
+    params.startDate = filterDateRange.value[0]
+    params.endDate = filterDateRange.value[1]
+  }
+  if (filterOrderSn.value.trim()) {
+    params.orderSn = filterOrderSn.value.trim()
+  }
+  if (filterProductName.value.trim()) {
+    params.productName = filterProductName.value.trim()
+  }
+  return params
+}
+
 const fetchOrders = async () => {
+  const params = buildFilterParams()
   if (isAdmin.value) {
-    const params = {
-      page: currentPage.value,
-      pageSize: pageSize.value
-    }
-    if (filterStatus.value !== null && filterStatus.value !== undefined) {
-      params.status = filterStatus.value
-    }
-    if (filterDateRange.value && filterDateRange.value.length === 2) {
-      params.startDate = filterDateRange.value[0]
-      params.endDate = filterDateRange.value[1]
-    }
     const data = await adminListOrders(params)
     orders.value = data.records
     total.value = data.total
   } else {
-    const data = await getMyOrders(currentPage.value, pageSize.value)
+    const data = await getMyOrders(params)
     orders.value = data.records
     total.value = data.total
   }

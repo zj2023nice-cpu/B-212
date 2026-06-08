@@ -15,7 +15,7 @@ export const removeCartItem = (id) => request.delete(`/cart/${id}`)
 export const clearCart = () => request.delete('/cart/clear')
 
 export const createOrder = (data) => request.post('/orders', data)
-export const getMyOrders = (page = 1, pageSize = 10) => request.get('/orders', { params: { page, pageSize } })
+export const getMyOrders = (params) => request.get('/orders', { params })
 export const getOrderDetail = (id) => request.get(`/orders/${id}`)
 export const getOrderItems = (id) => request.get(`/orders/${id}/items`)
 export const updateOrderStatus = (id, status) => request.put(`/orders/${id}/status`, null, { params: { status } })

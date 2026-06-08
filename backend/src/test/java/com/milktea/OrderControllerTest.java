@@ -185,11 +185,102 @@ class OrderControllerTest {
         
         when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
         
-        var result = orderController.getMyOrders(1, 10);
+        var result = orderController.getMyOrders(1, 10, null, null, null, null, null);
         
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertEquals(1, result.getData().getRecords().size());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 按状态筛选")
+    void testGetMyOrders_FilterByStatus() {
+        setupUserAuthentication();
+        Page<Order> page = new Page<>();
+        page.setRecords(Collections.singletonList(testOrder));
+        page.setTotal(1);
+        
+        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        
+        var result = orderController.getMyOrders(1, 10, "PREPARING", null, null, null, null);
+        
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 按日期范围筛选")
+    void testGetMyOrders_FilterByDateRange() {
+        setupUserAuthentication();
+        Page<Order> page = new Page<>();
+        page.setRecords(Collections.singletonList(testOrder));
+        page.setTotal(1);
+        
+        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        
+        var result = orderController.getMyOrders(1, 10, null, "2025-01-01", "2025-12-31", null, null);
+        
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 按订单编号模糊查询")
+    void testGetMyOrders_FilterByOrderSn() {
+        setupUserAuthentication();
+        Page<Order> page = new Page<>();
+        page.setRecords(Collections.singletonList(testOrder));
+        page.setTotal(1);
+        
+        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        
+        var result = orderController.getMyOrders(1, 10, null, null, null, "TEST123", null);
+        
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 按商品名称模糊查询")
+    void testGetMyOrders_FilterByProductName() {
+        setupUserAuthentication();
+        Page<Order> page = new Page<>();
+        page.setRecords(Collections.singletonList(testOrder));
+        page.setTotal(1);
+        
+        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        
+        var result = orderController.getMyOrders(1, 10, null, null, null, null, "珍珠奶茶");
+        
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 多条件组合筛选")
+    void testGetMyOrders_CombinedFilters() {
+        setupUserAuthentication();
+        Page<Order> page = new Page<>();
+        page.setRecords(Collections.singletonList(testOrder));
+        page.setTotal(1);
+        
+        when(orderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        
+        var result = orderController.getMyOrders(1, 10, "PREPARING", "2025-01-01", "2025-12-31", "TEST", "奶茶");
+        
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    @DisplayName("测试 getMyOrders - 无效状态值")
+    void testGetMyOrders_InvalidStatus() {
+        setupUserAuthentication();
+        
+        var result = orderController.getMyOrders(1, 10, "INVALID_STATUS", null, null, null, null);
+        
+        assertFalse(result.isSuccess());
+        assertEquals("Invalid order status", result.getMessage());
     }
 
     @Test
