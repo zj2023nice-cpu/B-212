@@ -71,7 +71,7 @@
           
           <el-dropdown>
             <div class="flex items-center space-x-2 cursor-pointer">
-              <el-avatar :size="32" :src="userStore.user?.avatar">{{ userStore.user?.nickname?.charAt(0) }}</el-avatar>
+              <el-avatar :size="32" :src="userStore.user?.avatarUrl">{{ userStore.user?.nickname?.charAt(0) }}</el-avatar>
               <span class="hidden md:inline font-medium">{{ userStore.user?.nickname }}</span>
             </div>
             <template #dropdown>

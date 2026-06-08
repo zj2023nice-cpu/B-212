@@ -32,7 +32,7 @@
         class="glass-card p-4"
       >
         <div class="flex items-start gap-3">
-          <el-avatar :size="36" :src="review.avatar">
+          <el-avatar :size="36" :src="review.avatarUrl">
             {{ review.nickname?.charAt(0) || '?' }}
           </el-avatar>
           <div class="flex-grow min-w-0">

@@ -93,7 +93,7 @@ public class FeedbackController {
             User user = userMap.get(fb.getUserId());
             if (user != null) {
                 vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
-                vo.setAvatar(user.getAvatar());
+                vo.setAvatarUrl(user.getAvatarUrl());
             } else {
                 vo.setNickname("匿名用户");
             }

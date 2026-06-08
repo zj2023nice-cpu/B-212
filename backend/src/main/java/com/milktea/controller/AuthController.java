@@ -118,7 +118,7 @@ public class AuthController {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userService.getByUsername(username);
             if (user != null) {
-                String oldAvatar = user.getAvatar();
+                String oldAvatar = user.getAvatarUrl();
                 userService.updateAvatar(user.getId(), avatarUrl);
                 if (oldAvatar != null && oldAvatar.startsWith("/uploads/avatars/")) {
                     try {

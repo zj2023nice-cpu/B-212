@@ -15,5 +15,5 @@ public class FeedbackVO {
     private List<String> images;
     private LocalDateTime createTime;
     private String nickname;
-    private String avatar;
+    private String avatarUrl;
 }

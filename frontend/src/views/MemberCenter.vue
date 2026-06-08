@@ -177,10 +177,10 @@ let cropState = {
 }
 
 const avatarFullUrl = computed(() => {
-  const avatar = userStore.user?.avatar
-  if (!avatar) return ''
-  if (avatar.startsWith('http')) return avatar
-  return avatar
+  const avatarUrl = userStore.user?.avatarUrl
+  if (!avatarUrl) return ''
+  if (avatarUrl.startsWith('http')) return avatarUrl
+  return avatarUrl
 })
 
 const levelList = [

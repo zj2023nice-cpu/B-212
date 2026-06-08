@@ -82,7 +82,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public void updateAvatar(Long userId, String avatarUrl) {
         User user = new User();
         user.setId(userId);
-        user.setAvatar(avatarUrl);
+        user.setAvatarUrl(avatarUrl);
         this.updateById(user);
     }
 }

@@ -399,11 +399,11 @@ class FeedbackControllerTest {
         com.milktea.entity.User user1 = new com.milktea.entity.User();
         user1.setId(1L);
         user1.setNickname("用户A");
-        user1.setAvatar("/avatar/a.png");
+        user1.setAvatarUrl("/avatar/a.png");
         com.milktea.entity.User user2 = new com.milktea.entity.User();
         user2.setId(2L);
         user2.setNickname("用户B");
-        user2.setAvatar("/avatar/b.png");
+        user2.setAvatarUrl("/avatar/b.png");
 
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
         when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));

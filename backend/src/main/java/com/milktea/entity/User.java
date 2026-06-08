@@ -1,6 +1,7 @@
 package com.milktea.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -15,7 +16,8 @@ public class User {
     private String password;
     private String nickname;
     private String phone;
-    private String avatar;
+    @TableField("avatar")
+    private String avatarUrl;
     private String role;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
