@@ -63,6 +63,7 @@ CREATE TABLE `orders` (
     `user_coupon_id` BIGINT COMMENT '使用的优惠券ID',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0-待支付, 1-制作中, 2-配送中, 4-已送达, 5-已评价',
     `remark` VARCHAR(255) COMMENT '备注',
+    `cancel_reason` VARCHAR(255) COMMENT '取消原因',
     `address_id` BIGINT COMMENT '收货地址ID',
     `address_contact_name` VARCHAR(50) COMMENT '收货联系人',
     `address_phone` VARCHAR(20) COMMENT '收货手机号',
@@ -180,3 +181,14 @@ CREATE TABLE `addresses` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB COMMENT='收货地址表';
+
+-- 13. 订单取消日志表
+CREATE TABLE `order_cancel_logs` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `order_id` BIGINT NOT NULL COMMENT '订单ID',
+    `cancel_reason` VARCHAR(255) NOT NULL COMMENT '取消原因',
+    `operator` VARCHAR(50) NOT NULL DEFAULT 'SYSTEM' COMMENT '操作者: SYSTEM-系统自动, USER-用户手动',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    UNIQUE KEY `uk_order_id` (`order_id`)
+) ENGINE=InnoDB COMMENT='订单取消日志表';

@@ -57,6 +57,9 @@ public class OrderController {
     @Autowired
     private AddressService addressService;
 
+    @Autowired
+    private OrderCancelLogMapper orderCancelLogMapper;
+
     private Long getCurrentUserId() {
         Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
         if (details instanceof Long) {
@@ -139,7 +142,7 @@ public class OrderController {
         order.setDiscountAmount(discountAmount);
         order.setPayAmount(payAmount);
         order.setUserCouponId(userCouponId);
-        order.setStatus(1);
+        order.setStatus(0);
         order.setRemark(orderReq.getRemark());
 
         if (orderReq.getAddressId() != null) {
@@ -192,13 +195,7 @@ public class OrderController {
             orderMapper.updateById(order);
         }
 
-        try {
-            memberService.earnPoints(userId, order.getId(), order.getPayAmount());
-        } catch (Exception e) {
-            logger.warn("积分发放失败，不影响订单: userId={}, orderId={}, reason={}", userId, order.getId(), e.getMessage());
-        }
-
-        logger.info("订单创建成功: orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}, memberDiscount={}", 
+        logger.info("订单创建成功(待支付): orderId={}, userId={}, totalAmount={}, discountAmount={}, payAmount={}, couponRedeemed={}, memberDiscount={}", 
                 order.getId(), userId, totalAmount, couponRedeemed ? discountAmount : BigDecimal.ZERO, 
                 couponRedeemed ? payAmount : totalAmount, couponRedeemed, memberDiscountAmount);
         return Result.success(order);
@@ -280,6 +277,10 @@ public class OrderController {
         if (!isAdmin) {
             boolean isAllowedTransition = false;
             
+            if (status == 1 && currentStatus == 0) {
+                isAllowedTransition = true;
+            }
+            
             if (status == 3 && (currentStatus == 0 || currentStatus == 1 || currentStatus == 2)) {
                 isAllowedTransition = true;
             }
@@ -293,15 +294,44 @@ public class OrderController {
             }
         }
 
+        if (status == 1 && currentStatus == 0) {
+            Order refreshed = orderMapper.selectById(id);
+            if (refreshed.getStatus() != 0) {
+                return Result.error("Order status has changed, please refresh");
+            }
+            try {
+                memberService.earnPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
+            } catch (Exception e) {
+                logger.warn("支付后积分发放失败，不影响订单: orderId={}, reason={}", id, e.getMessage());
+            }
+            logger.info("订单已支付: orderId={}, userId={}", id, existingOrder.getUserId());
+        }
+
         if (status == 3 && currentStatus != 3) {
             try {
                 restoreOrderStock(id);
-                try {
-                    memberService.deductPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
-                } catch (Exception e) {
-                    logger.warn("积分扣减失败，不影响取消订单: orderId={}, reason={}", id, e.getMessage());
+                if (currentStatus != 0) {
+                    try {
+                        memberService.deductPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
+                    } catch (Exception e) {
+                        logger.warn("积分扣减失败，不影响取消订单: orderId={}, reason={}", id, e.getMessage());
+                    }
                 }
-                logger.info("订单已取消，所有商品库存已恢复: orderId={}", id);
+                String cancelReason = "用户主动取消";
+                Order orderToUpdate = new Order();
+                orderToUpdate.setId(id);
+                orderToUpdate.setStatus(status);
+                orderToUpdate.setCancelReason(cancelReason);
+                orderMapper.updateById(orderToUpdate);
+
+                OrderCancelLog cancelLog = new OrderCancelLog();
+                cancelLog.setOrderId(id);
+                cancelLog.setCancelReason(cancelReason);
+                cancelLog.setOperator("USER");
+                orderCancelLogMapper.insert(cancelLog);
+
+                logger.info("订单已取消，所有商品库存已恢复: orderId={}, cancelReason={}", id, cancelReason);
+                return Result.success("Status updated");
             } catch (Exception e) {
                 logger.error("取消订单失败: orderId={}, 原因={}", id, e.getMessage());
                 throw e;

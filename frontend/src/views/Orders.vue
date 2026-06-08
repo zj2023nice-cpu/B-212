@@ -24,12 +24,24 @@
             <span class="text-xl font-bold text-primary">¥{{ order.payAmount || order.totalAmount }}</span>
             <span v-if="order.discountAmount > 0" class="text-xs text-red-500 line-through">¥{{ order.totalAmount }}</span>
           </div>
-          <div class="text-xs text-gray-400">
-            {{ formatDate(order.createTime) }}
+          <div class="text-right">
+            <div class="text-xs text-gray-400">
+              {{ formatDate(order.createTime) }}
+            </div>
+            <div v-if="order.status === 3 && order.cancelReason" class="text-xs text-red-400 mt-1">
+              {{ order.cancelReason }}
+            </div>
           </div>
         </div>
 
         <div class="mt-4 flex justify-end gap-3">
+          <el-button
+            v-if="order.status === 0"
+            type="primary"
+            size="small"
+            @click.stop="handlePay(order)"
+            >去支付</el-button
+          >
           <el-button
             v-if="order.status === 4"
             type="primary"
@@ -161,6 +173,16 @@ const openFeedbackDialog = order => {
 const openCancelDialog = order => {
   currentOrder.value = order
   cancelVisible.value = true
+}
+
+const handlePay = async order => {
+  try {
+    await updateOrderStatus(order.id, 1)
+    ElMessage.success('支付成功，订单制作中')
+    fetchOrders()
+  } catch (error) {
+    ElMessage.error('支付失败：' + (error.response?.data?.message || error.message))
+  }
 }
 
 const handleCancelOrder = async () => {

@@ -6,7 +6,11 @@
         <div class="text-3xl font-bold mb-2">
           {{ getStatusText(order?.status) }}
         </div>
-        <p class="opacity-80">感谢您选择我们的奶茶</p>
+        <p v-if="order?.status === 0" class="opacity-80">请在15分钟内完成支付，超时订单将自动取消</p>
+        <p v-else-if="order?.status === 3 && order?.cancelReason" class="opacity-80 text-yellow-200">
+          取消原因：{{ order.cancelReason }}
+        </p>
+        <p v-else class="opacity-80">感谢您选择我们的奶茶</p>
       </div>
 
       <!-- Tracking (Visualized) -->
@@ -16,7 +20,7 @@
           finish-status="success"
           align-center
         >
-          <el-step title="已下单" />
+          <el-step title="待支付" />
           <el-step title="制作中" />
           <el-step title="配送中" />
           <el-step title="已送达" />
@@ -70,7 +74,14 @@
       </div>
 
       <!-- Logic to simulate status tracking -->
-      <div v-if="order?.status < 4 && order?.status !== 3" class="p-8 text-center border-t">
+      <div v-if="order?.status === 0" class="p-8 text-center border-t">
+        <p class="text-sm text-gray-400 mb-4">订单待支付，请尽快完成支付</p>
+        <div class="flex justify-center gap-4">
+          <el-button type="danger" plain @click="openCancelDialog">取消订单</el-button>
+          <el-button type="primary" @click="handlePay">立即支付</el-button>
+        </div>
+      </div>
+      <div v-else-if="order?.status < 4 && order?.status !== 3" class="p-8 text-center border-t">
         <p class="text-sm text-gray-400 mb-4 italic">
           系统演示：模拟物流进度推进...
         </p>
@@ -81,6 +92,12 @@
           <el-button type="primary" plain @click="simulateProgress"
             >模拟下一步进度</el-button
           >
+        </div>
+      </div>
+      <div v-if="order?.status === 3 && order?.cancelReason" class="p-6 border-t bg-red-50">
+        <div class="flex items-center gap-2 text-red-600">
+          <el-icon><Warning /></el-icon>
+          <span class="font-medium">取消原因：{{ order.cancelReason }}</span>
         </div>
       </div>
     </div>
@@ -128,6 +145,7 @@ const getStatusText = status => {
 }
 
 const getStepActive = status => {
+  if (status === 0) return 0
   if (status === 3) return 0
   if (status === 1) return 1
   if (status === 2) return 2
@@ -152,10 +170,20 @@ const fetchData = async () => {
 
 const simulateProgress = async () => {
   let nextStatus = order.value.status + 1
-  if (nextStatus === 3) nextStatus = 4 // 跳过“已取消”状态
+  if (nextStatus === 3) nextStatus = 4
   if (nextStatus > 4) return
   await updateOrderStatus(order.value.id, nextStatus)
   fetchData()
+}
+
+const handlePay = async () => {
+  try {
+    await updateOrderStatus(order.value.id, 1)
+    ElMessage.success('支付成功，订单制作中')
+    fetchData()
+  } catch (error) {
+    ElMessage.error('支付失败：' + (error.response?.data?.message || error.message))
+  }
 }
 
 const openCancelDialog = () => {

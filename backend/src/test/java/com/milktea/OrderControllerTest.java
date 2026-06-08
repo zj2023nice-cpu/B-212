@@ -7,6 +7,9 @@ import com.milktea.entity.*;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
+import com.milktea.service.CouponService;
+import com.milktea.service.MemberService;
+import com.milktea.service.AddressService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,18 @@ class OrderControllerTest {
 
     @Mock
     private ProductService productService;
+
+    @Mock
+    private CouponService couponService;
+
+    @Mock
+    private MemberService memberService;
+
+    @Mock
+    private AddressService addressService;
+
+    @Mock
+    private OrderCancelLogMapper orderCancelLogMapper;
 
     @InjectMocks
     private OrderController orderController;
@@ -140,6 +155,7 @@ class OrderControllerTest {
         when(cartItemMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(cartItems);
         when(productMapper.selectById(1L)).thenReturn(testProduct);
         when(productService.deductStockWithRetry(eq(1L), eq(2), anyInt())).thenReturn(true);
+        when(memberService.calculateDiscount(eq(1L), any(BigDecimal.class))).thenReturn(BigDecimal.ZERO);
         when(orderMapper.insert(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(1L);
@@ -314,17 +330,20 @@ class OrderControllerTest {
         order.setId(1L);
         order.setUserId(1L);
         order.setStatus(1);
+        order.setPayAmount(new BigDecimal("30.00"));
         
         when(orderMapper.selectById(1L)).thenReturn(order);
         when(orderItemMapper.selectList(any(LambdaQueryWrapper.class)))
             .thenReturn(Collections.singletonList(testOrderItem));
         when(productService.restoreStock(1L, 2)).thenReturn(true);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
+        when(orderCancelLogMapper.insert(any(OrderCancelLog.class))).thenReturn(1);
         
         var result = orderController.updateStatus(1L, 3);
         
         assertTrue(result.isSuccess());
         verify(productService, times(1)).restoreStock(1L, 2);
+        verify(orderCancelLogMapper, times(1)).insert(any(OrderCancelLog.class));
     }
 
     @Test

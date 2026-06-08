@@ -35,3 +35,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+order:
+  timeout:
+    minutes: 15
+    cron-interval-seconds: 60
+    cancel-reason: "超时未支付"
