@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -65,7 +66,7 @@ public class MemberServiceImpl extends ServiceImpl<MemberLevelMapper, MemberLeve
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
     public PointsRecord earnPoints(Long userId, Long orderId, BigDecimal amount) {
         MemberLevel memberLevel = getOrCreateMemberLevel(userId);
 
@@ -101,7 +102,7 @@ public class MemberServiceImpl extends ServiceImpl<MemberLevelMapper, MemberLeve
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
     public void deductPoints(Long userId, Long orderId, BigDecimal amount) {
         MemberLevel memberLevel = getOrCreateMemberLevel(userId);
 

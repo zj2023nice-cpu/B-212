@@ -106,25 +106,25 @@ public class OrderController {
             }
         }
 
-        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal couponDiscountAmount = BigDecimal.ZERO;
         Long userCouponId = orderReq.getUserCouponId();
 
         if (userCouponId != null) {
             try {
-                discountAmount = couponService.calculateDiscount(userCouponId, totalAmount);
-                if (discountAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                couponDiscountAmount = couponService.calculateDiscount(userCouponId, totalAmount);
+                if (couponDiscountAmount.compareTo(BigDecimal.ZERO) <= 0) {
                     userCouponId = null;
                 }
             } catch (Exception e) {
                 logger.warn("优惠券计算失败，将不使用优惠券: {}", e.getMessage());
                 userCouponId = null;
-                discountAmount = BigDecimal.ZERO;
+                couponDiscountAmount = BigDecimal.ZERO;
             }
         }
 
-        BigDecimal afterCouponAmount = totalAmount.subtract(discountAmount);
+        BigDecimal afterCouponAmount = totalAmount.subtract(couponDiscountAmount);
         BigDecimal memberDiscountAmount = memberService.calculateDiscount(userId, afterCouponAmount);
-        discountAmount = discountAmount.add(memberDiscountAmount);
+        BigDecimal discountAmount = couponDiscountAmount.add(memberDiscountAmount);
 
         BigDecimal payAmount = totalAmount.subtract(discountAmount);
 
@@ -167,8 +167,10 @@ public class OrderController {
         }
 
         if (userCouponId != null && !couponRedeemed) {
-            order.setDiscountAmount(BigDecimal.ZERO);
-            order.setPayAmount(totalAmount);
+            discountAmount = memberDiscountAmount;
+            payAmount = totalAmount.subtract(discountAmount);
+            order.setDiscountAmount(discountAmount);
+            order.setPayAmount(payAmount);
             order.setUserCouponId(null);
             orderMapper.updateById(order);
         }
