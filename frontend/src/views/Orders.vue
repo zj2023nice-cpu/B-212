@@ -47,7 +47,7 @@
             type="primary"
             plain
             size="small"
-            @click.stop="openFeedbackDialog(order)"
+            @click.stop="$router.push(`/order/${order.id}`)"
             >待评价</el-button
           >
           <el-button
@@ -80,27 +80,6 @@
       />
     </div>
 
-    <!-- Feedback Dialog -->
-    <el-dialog v-model="feedbackVisible" title="评价订单" width="400px">
-      <el-form label-position="top">
-        <el-form-item label="评分">
-          <el-rate v-model="feedbackForm.rating" />
-        </el-form-item>
-        <el-form-item label="评论内容">
-          <el-input
-            v-model="feedbackForm.content"
-            type="textarea"
-            placeholder="分享您的饮用体验..."
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button type="primary" class="w-full" @click="handleFeedbackSubmit"
-          >提交评价</el-button
-        >
-      </template>
-    </el-dialog>
-
     <!-- Cancel Order Dialog -->
     <el-dialog v-model="cancelVisible" title="取消订单" width="400px">
       <div class="text-center py-4">
@@ -119,19 +98,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
-import { getMyOrders, submitFeedback, updateOrderStatus } from '@/api'
+import { ref, onMounted } from 'vue'
+import { getMyOrders, updateOrderStatus } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
 
 const orders = ref([])
-const feedbackVisible = ref(false)
 const cancelVisible = ref(false)
 const currentOrder = ref(null)
-const feedbackForm = reactive({
-  rating: 5,
-  content: ''
-})
 
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -165,11 +139,6 @@ const formatDate = dateStr => {
   return new Date(dateStr).toLocaleString()
 }
 
-const openFeedbackDialog = order => {
-  currentOrder.value = order
-  feedbackVisible.value = true
-}
-
 const openCancelDialog = order => {
   currentOrder.value = order
   cancelVisible.value = true
@@ -194,17 +163,6 @@ const handleCancelOrder = async () => {
   } catch (error) {
     ElMessage.error('取消订单失败：' + (error.response?.data?.message || error.message))
   }
-}
-
-const handleFeedbackSubmit = async () => {
-  await submitFeedback({
-    orderId: currentOrder.value.id,
-    rating: feedbackForm.rating,
-    content: feedbackForm.content
-  })
-  ElMessage.success('感谢您的评价！')
-  feedbackVisible.value = false
-  fetchOrders()
 }
 
 const handlePageSizeChange = async () => {

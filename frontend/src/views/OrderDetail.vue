@@ -1,7 +1,6 @@
 <template>
   <div class="max-w-3xl mx-auto">
     <div class="glass-card overflow-hidden">
-      <!-- Header Status -->
       <div class="bg-primary p-8 text-white text-center">
         <div class="text-3xl font-bold mb-2">
           {{ getStatusText(order?.status) }}
@@ -13,7 +12,6 @@
         <p v-else class="opacity-80">感谢您选择我们的奶茶</p>
       </div>
 
-      <!-- Tracking (Visualized) -->
       <div class="p-8">
         <el-steps
           :active="getStepActive(order?.status)"
@@ -27,7 +25,6 @@
         </el-steps>
       </div>
 
-      <!-- Address Section -->
       <div v-if="order?.addressFull" class="p-8 border-t">
         <h4 class="font-bold mb-3">收货信息</h4>
         <div class="flex items-center gap-4 text-sm">
@@ -37,7 +34,6 @@
         <div class="text-sm text-gray-500 mt-1">{{ order.addressFull }}</div>
       </div>
 
-      <!-- Items Section -->
       <div class="p-8 bg-gray-50 border-t">
         <h4 class="font-bold mb-4">商品详情</h4>
         <div class="space-y-4">
@@ -73,7 +69,6 @@
         </div>
       </div>
 
-      <!-- Logic to simulate status tracking -->
       <div v-if="order?.status === 0" class="p-8 text-center border-t">
         <p class="text-sm text-gray-400 mb-4">订单待支付，请尽快完成支付</p>
         <div class="flex justify-center gap-4">
@@ -100,9 +95,24 @@
           <span class="font-medium">取消原因：{{ order.cancelReason }}</span>
         </div>
       </div>
+
+      <div v-if="order?.status === 4" class="p-8 border-t">
+        <div class="text-center mb-6">
+          <el-button type="primary" size="large" @click="openReviewDialog">
+            <el-icon class="mr-1"><EditPen /></el-icon>
+            评价订单
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="order?.status === 5" class="p-8 border-t bg-green-50">
+        <div class="flex items-center justify-center gap-2 text-green-600">
+          <el-icon><CircleCheck /></el-icon>
+          <span class="font-medium">该订单已完成评价</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Cancel Order Dialog -->
     <el-dialog v-model="cancelVisible" title="取消订单" width="400px">
       <div class="text-center py-4">
         <el-icon class="text-4xl text-warning mb-4"><Warning /></el-icon>
@@ -116,21 +126,58 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="reviewVisible"
+      title="评价订单"
+      width="600px"
+      :close-on-click-modal="false"
+      custom-class="review-dialog"
+    >
+      <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+        <ReviewForm
+          v-for="item in items"
+          :key="item.id"
+          :ref="el => setReviewRef(item.id, el)"
+          :product="item"
+          :order-id="order?.id"
+        />
+      </div>
+      <template #footer>
+        <div class="flex justify-center">
+          <el-button @click="reviewVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmitReview">
+            提交评价
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOrderDetail, getOrderItems, updateOrderStatus } from '@/api'
+import { getOrderDetail, getOrderItems, updateOrderStatus, submitFeedback } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Warning } from '@element-plus/icons-vue'
+import { Warning, EditPen, CircleCheck } from '@element-plus/icons-vue'
+import ReviewForm from '@/components/ReviewForm.vue'
 
 const route = useRoute()
 const router = useRouter()
 const order = ref(null)
 const items = ref([])
 const cancelVisible = ref(false)
+const reviewVisible = ref(false)
+const submitting = ref(false)
+
+const reviewRefs = ref({})
+
+const setReviewRef = (id, el) => {
+  if (el) {
+    reviewRefs.value[id] = el
+  }
+}
 
 const getStatusText = status => {
   const map = {
@@ -201,5 +248,43 @@ const handleCancelOrder = async () => {
   }
 }
 
+const openReviewDialog = () => {
+  reviewRefs.value = {}
+  reviewVisible.value = true
+}
+
+const handleSubmitReview = async () => {
+  const feedbacks = []
+  for (const item of items.value) {
+    const ref = reviewRefs.value[item.id]
+    if (!ref) continue
+    if (!ref.validate()) return
+    feedbacks.push(ref.getFeedbackData())
+  }
+
+  if (feedbacks.length === 0) {
+    ElMessage.warning('请至少评价一件商品')
+    return
+  }
+
+  submitting.value = true
+  try {
+    await submitFeedback(feedbacks)
+    ElMessage.success('评价提交成功，感谢您的反馈！')
+    reviewVisible.value = false
+    fetchData()
+  } catch (error) {
+    ElMessage.error('评价提交失败：' + (error.response?.data?.message || error.message))
+  } finally {
+    submitting.value = false
+  }
+}
+
 onMounted(fetchData)
 </script>
+
+<style>
+.review-dialog {
+  border-radius: 1.5rem !important;
+}
+</style>

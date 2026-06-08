@@ -138,7 +138,7 @@
             :key="product.id"
             class="glass-card overflow-hidden hover:shadow-xl transition-all group"
           >
-            <div class="h-48 overflow-hidden relative">
+            <div class="h-48 overflow-hidden relative cursor-pointer" @click="$router.push(`/product/${product.id}`)">
               <img
                 :src="product.image"
                 class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -148,13 +148,13 @@
                   type="primary"
                   circle
                   size="large"
-                  @click="openSpecDialog(product)"
+                  @click.stop="openSpecDialog(product)"
                 >
                   <el-icon><Plus /></el-icon>
                 </el-button>
               </div>
             </div>
-            <div class="p-4">
+            <div class="p-4 cursor-pointer" @click="$router.push(`/product/${product.id}`)">
               <h3 class="text-lg font-bold text-gray-800">{{ product.name }}</h3>
               <p class="text-gray-500 text-sm mt-1 line-clamp-2">
                 {{ product.description }}
@@ -163,6 +163,10 @@
                 <span class="text-xl font-bold text-primary"
                   >¥{{ product.price }}</span
                 >
+                <el-button type="primary" link size="small">
+                  查看详情
+                  <el-icon class="ml-1"><ArrowRight /></el-icon>
+                </el-button>
               </div>
             </div>
           </div>
@@ -233,7 +237,7 @@ import { ref, onMounted, reactive } from 'vue'
 import { getCategories, getProducts, getHotRanking, getRecommendation } from '@/api'
 import { useCartStore } from '@/store/cart'
 import { ElMessage } from 'element-plus'
-import { Trophy, Star, Search, Plus } from '@element-plus/icons-vue'
+import { Trophy, Star, Search, Plus, ArrowRight } from '@element-plus/icons-vue'
 
 const cartStore = useCartStore()
 const categories = ref([])

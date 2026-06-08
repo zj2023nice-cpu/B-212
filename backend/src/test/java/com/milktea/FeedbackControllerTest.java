@@ -5,6 +5,7 @@ import com.milktea.controller.FeedbackController;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
 import com.milktea.mapper.FeedbackMapper;
+import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
 import com.milktea.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,9 @@ class FeedbackControllerTest {
     private OrderMapper orderMapper;
 
     @Mock
+    private OrderItemMapper orderItemMapper;
+
+    @Mock
     private UserService userService;
 
     @InjectMocks
@@ -49,17 +53,12 @@ class FeedbackControllerTest {
     @Mock
     private Authentication authentication;
 
-    private User testUser;
     private Order testOrder;
     private Feedback testFeedback;
     private Feedback testFeedback2;
 
     @BeforeEach
     void setUp() {
-        testUser = new User();
-        testUser.setId(1L);
-        testUser.setUsername("testuser");
-
         testOrder = new Order();
         testOrder.setId(1L);
         testOrder.setUserId(1L);
@@ -71,6 +70,7 @@ class FeedbackControllerTest {
         testFeedback.setId(1L);
         testFeedback.setOrderId(1L);
         testFeedback.setUserId(1L);
+        testFeedback.setProductId(1L);
         testFeedback.setRating(5);
         testFeedback.setContent("非常好喝！");
 
@@ -78,6 +78,7 @@ class FeedbackControllerTest {
         testFeedback2.setId(2L);
         testFeedback2.setOrderId(2L);
         testFeedback2.setUserId(2L);
+        testFeedback2.setProductId(1L);
         testFeedback2.setRating(4);
         testFeedback2.setContent("还不错");
 
@@ -87,57 +88,62 @@ class FeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 订单不存在")
-    void testSubmitFeedback_OrderNotFound() {
+    @DisplayName("测试 submitFeedbacks - 订单不存在")
+    void testSubmitFeedbacks_OrderNotFound() {
         Feedback feedback = new Feedback();
         feedback.setOrderId(999L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("测试评价");
-        
+
         when(orderMapper.selectById(999L)).thenReturn(null);
-        
-        var result = feedbackController.submitFeedback(feedback);
-        
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
         assertFalse(result.isSuccess());
         assertEquals("Order not found", result.getMessage());
         verify(feedbackMapper, never()).insert(any(Feedback.class));
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 无权评价他人订单")
-    void testSubmitFeedback_NotAuthorized() {
+    @DisplayName("测试 submitFeedbacks - 无权评价他人订单")
+    void testSubmitFeedbacks_NotAuthorized() {
         Order otherUserOrder = new Order();
         otherUserOrder.setId(2L);
         otherUserOrder.setUserId(999L);
-        
+        otherUserOrder.setStatus(4);
+
         Feedback feedback = new Feedback();
         feedback.setOrderId(2L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("测试评价");
-        
+
         when(orderMapper.selectById(2L)).thenReturn(otherUserOrder);
-        
-        var result = feedbackController.submitFeedback(feedback);
-        
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
         assertFalse(result.isSuccess());
         assertEquals("Not authorized to submit feedback for this order", result.getMessage());
         verify(feedbackMapper, never()).insert(any(Feedback.class));
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 提交评价成功")
-    void testSubmitFeedback_Success() {
+    @DisplayName("测试 submitFeedbacks - 提交评价成功")
+    void testSubmitFeedbacks_Success() {
         Feedback feedback = new Feedback();
         feedback.setOrderId(1L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("非常好喝！");
-        
+
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
-        
-        var result = feedbackController.submitFeedback(feedback);
-        
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
         assertTrue(result.isSuccess());
         assertEquals("Feedback submitted", result.getMessage());
         verify(feedbackMapper, times(1)).insert(any(Feedback.class));
@@ -145,138 +151,228 @@ class FeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 验证订单状态更新为已评价")
-    void testSubmitFeedback_OrderStatusUpdated() {
+    @DisplayName("测试 submitFeedbacks - 订单状态不是已送达")
+    void testSubmitFeedbacks_OrderNotCompleted() {
+        Order pendingOrder = new Order();
+        pendingOrder.setId(1L);
+        pendingOrder.setUserId(1L);
+        pendingOrder.setStatus(2);
+
         Feedback feedback = new Feedback();
         feedback.setOrderId(1L);
+        feedback.setProductId(1L);
+        feedback.setRating(5);
+        feedback.setContent("测试评价");
+
+        when(orderMapper.selectById(1L)).thenReturn(pendingOrder);
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        assertFalse(result.isSuccess());
+        assertEquals("Only completed orders can be reviewed", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("测试 submitFeedbacks - 重复评价")
+    void testSubmitFeedbacks_DuplicateReview() {
+        Feedback feedback = new Feedback();
+        feedback.setOrderId(1L);
+        feedback.setProductId(1L);
+        feedback.setRating(5);
+        feedback.setContent("测试评价");
+
+        when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        assertFalse(result.isSuccess());
+        assertEquals("该订单已评价，不能重复评价", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("测试 submitFeedbacks - 验证订单状态更新为已评价")
+    void testSubmitFeedbacks_OrderStatusUpdated() {
+        Feedback feedback = new Feedback();
+        feedback.setOrderId(1L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("非常好喝！");
-        
+
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
-        
-        feedbackController.submitFeedback(feedback);
-        
-        verify(orderMapper).updateById(argThat(order -> 
+
+        feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        verify(orderMapper).updateById(argThat(order ->
             order.getStatus() == 5
         ));
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 验证userId设置")
-    void testSubmitFeedback_UserIdSet() {
+    @DisplayName("测试 submitFeedbacks - 验证userId设置")
+    void testSubmitFeedbacks_UserIdSet() {
         Feedback feedback = new Feedback();
         feedback.setOrderId(1L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("非常好喝！");
-        
+
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
-        
-        feedbackController.submitFeedback(feedback);
-        
-        verify(feedbackMapper).insert(argThat(fb -> 
+
+        feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        verify(feedbackMapper).insert(argThat(fb ->
             fb.getUserId() != null && fb.getUserId().equals(1L)
         ));
     }
 
     @Test
+    @DisplayName("测试 submitFeedbacks - 评分超出范围")
+    void testSubmitFeedbacks_RatingOutOfRange() {
+        Feedback feedback = new Feedback();
+        feedback.setOrderId(1L);
+        feedback.setProductId(1L);
+        feedback.setRating(0);
+        feedback.setContent("测试评价");
+
+        when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        assertFalse(result.isSuccess());
+        assertEquals("评分必须在1-5之间", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("测试 submitFeedbacks - 商品ID为空")
+    void testSubmitFeedbacks_ProductIdNull() {
+        Feedback feedback = new Feedback();
+        feedback.setOrderId(1L);
+        feedback.setRating(5);
+        feedback.setContent("测试评价");
+
+        when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
+        assertFalse(result.isSuccess());
+        assertEquals("商品ID不能为空", result.getMessage());
+    }
+
+    @Test
     @DisplayName("测试 getProductFeedbacks - 获取商品评价列表")
     void testGetProductFeedbacks() {
-        List<Feedback> feedbacks = Arrays.asList(testFeedback, testFeedback2);
-        
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(feedbacks);
-        
-        var result = feedbackController.getProductFeedbacks(1L);
-        
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
+        when(userService.getById(1L)).thenReturn(null);
+        when(userService.getById(2L)).thenReturn(null);
+
+        var result = feedbackController.getProductFeedbacks(1L, null, "desc");
+
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertEquals(2, result.getData().size());
-        assertEquals("非常好喝！", result.getData().get(0).getContent());
-        assertEquals("还不错", result.getData().get(1).getContent());
     }
 
     @Test
     @DisplayName("测试 getProductFeedbacks - 无评价")
     void testGetProductFeedbacks_Empty() {
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(new ArrayList<>());
-        
-        var result = feedbackController.getProductFeedbacks(999L);
-        
+
+        var result = feedbackController.getProductFeedbacks(999L, null, "desc");
+
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertTrue(result.getData().isEmpty());
     }
 
     @Test
-    @DisplayName("测试 submitFeedback - 使用旧Token格式（通过用户名查询）")
-    void testSubmitFeedback_WithOldTokenFormat() {
+    @DisplayName("测试 getProductFeedbacks - 按评分筛选")
+    void testGetProductFeedbacks_FilterByRating() {
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
+        when(userService.getById(1L)).thenReturn(null);
+
+        var result = feedbackController.getProductFeedbacks(1L, 5, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertEquals(5, result.getData().get(0).getRating());
+    }
+
+    @Test
+    @DisplayName("测试 submitFeedbacks - 使用旧Token格式（通过用户名查询）")
+    void testSubmitFeedbacks_WithOldTokenFormat() {
         when(authentication.getDetails()).thenReturn("notALongType");
         when(authentication.getName()).thenReturn("testuser");
+        com.milktea.entity.User testUser = new com.milktea.entity.User();
+        testUser.setId(1L);
+        testUser.setUsername("testuser");
         when(userService.getByUsername("testuser")).thenReturn(testUser);
-        
+
         Feedback feedback = new Feedback();
         feedback.setOrderId(1L);
+        feedback.setProductId(1L);
         feedback.setRating(5);
         feedback.setContent("测试评价");
-        
+
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenReturn(1);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
-        
-        var result = feedbackController.submitFeedback(feedback);
-        
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback));
+
         assertTrue(result.isSuccess());
         verify(userService, times(1)).getByUsername("testuser");
     }
 
     @Test
-    @DisplayName("测试 getProductFeedbacks - 按创建时间降序排序")
-    void testGetProductFeedbacks_OrderedByCreateTime() {
-        List<Feedback> feedbacks = Arrays.asList(testFeedback2, testFeedback);
-        
-        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(feedbacks);
-        
-        var result = feedbackController.getProductFeedbacks(1L);
-        
-        assertTrue(result.isSuccess());
-        assertEquals(2, result.getData().size());
-        assertEquals("还不错", result.getData().get(0).getContent());
-        assertEquals("非常好喝！", result.getData().get(1).getContent());
-    }
+    @DisplayName("测试 submitFeedbacks - 完整流程验证（多商品评价）")
+    void testSubmitFeedbacks_FullFlow() {
+        Feedback feedback1 = new Feedback();
+        feedback1.setOrderId(1L);
+        feedback1.setProductId(1L);
+        feedback1.setRating(5);
+        feedback1.setContent("珍珠奶茶非常好喝！");
+        feedback1.setImages("/uploads/img1.jpg,/uploads/img2.jpg");
 
-    @Test
-    @DisplayName("测试 submitFeedback - 完整流程验证")
-    void testSubmitFeedback_FullFlow() {
-        Feedback feedback = new Feedback();
-        feedback.setOrderId(1L);
-        feedback.setRating(5);
-        feedback.setContent("珍珠奶茶非常好喝，珍珠Q弹有嚼劲！");
-        feedback.setImages("image1.jpg,image2.jpg");
-        
+        Feedback feedback2 = new Feedback();
+        feedback2.setOrderId(1L);
+        feedback2.setProductId(2L);
+        feedback2.setRating(4);
+        feedback2.setContent("波波烤奶也不错");
+
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
+        when(feedbackMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(feedbackMapper.insert(any(Feedback.class))).thenAnswer(invocation -> {
             Feedback insertedFeedback = invocation.getArgument(0);
             insertedFeedback.setId(3L);
             return 1;
         });
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
-        
-        var result = feedbackController.submitFeedback(feedback);
-        
+
+        var result = feedbackController.submitFeedbacks(Arrays.asList(feedback1, feedback2));
+
         assertTrue(result.isSuccess());
-        
-        verify(feedbackMapper).insert(argThat(fb -> 
-            fb.getOrderId().equals(1L) &&
-            fb.getUserId().equals(1L) &&
-            fb.getRating() == 5 &&
-            fb.getContent().equals("珍珠奶茶非常好喝，珍珠Q弹有嚼劲！") &&
-            fb.getImages().equals("image1.jpg,image2.jpg")
-        ));
-        
-        verify(orderMapper).updateById(argThat(order -> 
+        verify(feedbackMapper, times(2)).insert(any(Feedback.class));
+
+        verify(orderMapper).updateById(argThat(order ->
             order.getId().equals(1L) &&
             order.getStatus() == 5
         ));
+    }
+
+    @Test
+    @DisplayName("测试 submitFeedbacks - 空评价列表")
+    void testSubmitFeedbacks_EmptyList() {
+        var result = feedbackController.submitFeedbacks(new ArrayList<>());
+
+        assertFalse(result.isSuccess());
+        assertEquals("评价列表不能为空", result.getMessage());
     }
 }

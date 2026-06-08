@@ -90,12 +90,14 @@ CREATE TABLE `feedbacks` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `order_id` BIGINT NOT NULL COMMENT '订单ID',
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `product_id` BIGINT NOT NULL COMMENT '商品ID',
     `rating` TINYINT NOT NULL COMMENT '评分 (1-5)',
     `content` TEXT COMMENT '评价内容',
     `images` TEXT COMMENT '评价图片URL (JSON)',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB COMMENT='评价与反馈表';
 
 -- 初始化数据

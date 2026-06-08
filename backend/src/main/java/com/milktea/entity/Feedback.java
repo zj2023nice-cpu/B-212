@@ -13,6 +13,7 @@ public class Feedback {
     private Long id;
     private Long orderId;
     private Long userId;
+    private Long productId;
     private Integer rating;
     private String content;
     private String images;
