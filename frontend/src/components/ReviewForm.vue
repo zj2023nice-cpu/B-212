@@ -92,6 +92,7 @@
 import { reactive, ref } from 'vue'
 import { uploadFeedbackImage } from '@/api'
 import { ElMessage } from 'element-plus'
+import { Delete, Plus } from '@element-plus/icons-vue'
 
 const props = defineProps({
   product: {

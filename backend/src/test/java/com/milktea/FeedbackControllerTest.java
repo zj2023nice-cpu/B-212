@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.milktea.controller.FeedbackController;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
+import com.milktea.entity.User;
 import com.milktea.mapper.FeedbackMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -22,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -268,15 +270,24 @@ class FeedbackControllerTest {
     @Test
     @DisplayName("测试 getProductFeedbacks - 获取商品评价列表")
     void testGetProductFeedbacks() {
+        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+        com.milktea.entity.User user2 = new com.milktea.entity.User();
+        user2.setId(2L);
+        user2.setNickname("用户2");
+
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
-        when(userService.getById(1L)).thenReturn(null);
-        when(userService.getById(2L)).thenReturn(null);
+        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
 
         var result = feedbackController.getProductFeedbacks(1L, null, "desc");
 
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertEquals(2, result.getData().size());
+        assertEquals("用户1", result.getData().get(0).getNickname());
+        assertEquals("用户2", result.getData().get(1).getNickname());
+        verify(userService, times(1)).listByIds(any(Collection.class));
     }
 
     @Test
@@ -289,13 +300,18 @@ class FeedbackControllerTest {
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
         assertTrue(result.getData().isEmpty());
+        verify(userService, never()).listByIds(any(Collection.class));
     }
 
     @Test
     @DisplayName("测试 getProductFeedbacks - 按评分筛选")
     void testGetProductFeedbacks_FilterByRating() {
+        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        user1.setId(1L);
+        user1.setNickname("用户1");
+
         when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
-        when(userService.getById(1L)).thenReturn(null);
+        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1));
 
         var result = feedbackController.getProductFeedbacks(1L, 5, "desc");
 
@@ -374,5 +390,39 @@ class FeedbackControllerTest {
 
         assertFalse(result.isSuccess());
         assertEquals("评价列表不能为空", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 批量查询用户信息避免N+1")
+    void testGetProductFeedbacks_BatchUserQuery() {
+        com.milktea.entity.User user1 = new com.milktea.entity.User();
+        user1.setId(1L);
+        user1.setNickname("用户A");
+        user1.setAvatar("/avatar/a.png");
+        com.milktea.entity.User user2 = new com.milktea.entity.User();
+        user2.setId(2L);
+        user2.setNickname("用户B");
+        user2.setAvatar("/avatar/b.png");
+
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback, testFeedback2));
+        when(userService.listByIds(any(Collection.class))).thenReturn(Arrays.asList(user1, user2));
+
+        feedbackController.getProductFeedbacks(1L, null, "desc");
+
+        verify(userService, times(1)).listByIds(any(Collection.class));
+        verify(userService, never()).getById(anyLong());
+    }
+
+    @Test
+    @DisplayName("测试 getProductFeedbacks - 用户不存在时显示匿名")
+    void testGetProductFeedbacks_UserNotFound() {
+        when(feedbackMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testFeedback));
+        when(userService.listByIds(any(Collection.class))).thenReturn(new ArrayList<>());
+
+        var result = feedbackController.getProductFeedbacks(1L, null, "desc");
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, result.getData().size());
+        assertEquals("匿名用户", result.getData().get(0).getNickname());
     }
 }

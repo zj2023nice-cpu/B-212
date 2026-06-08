@@ -5,7 +5,6 @@ import com.milktea.common.Result;
 import com.milktea.dto.FeedbackVO;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
-import com.milktea.entity.OrderItem;
 import com.milktea.entity.User;
 import com.milktea.mapper.FeedbackMapper;
 import com.milktea.mapper.OrderItemMapper;
@@ -55,6 +54,51 @@ public class FeedbackController {
         }
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userService.getByUsername(username).getId();
+    }
+
+    private Map<Long, User> batchGetUsers(List<Feedback> feedbacks) {
+        Set<Long> userIds = feedbacks.stream()
+                .map(Feedback::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<User> users = userService.listByIds(userIds);
+        return users.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+    }
+
+    private List<FeedbackVO> convertToVOList(List<Feedback> feedbacks, Map<Long, User> userMap) {
+        return feedbacks.stream().map(fb -> {
+            FeedbackVO vo = new FeedbackVO();
+            vo.setId(fb.getId());
+            vo.setOrderId(fb.getOrderId());
+            vo.setUserId(fb.getUserId());
+            vo.setProductId(fb.getProductId());
+            vo.setRating(fb.getRating());
+            vo.setContent(fb.getContent());
+            vo.setCreateTime(fb.getCreateTime());
+
+            if (fb.getImages() != null && !fb.getImages().isEmpty()) {
+                try {
+                    vo.setImages(Arrays.asList(fb.getImages().split(",")));
+                } catch (Exception e) {
+                    vo.setImages(Collections.emptyList());
+                }
+            } else {
+                vo.setImages(Collections.emptyList());
+            }
+
+            User user = userMap.get(fb.getUserId());
+            if (user != null) {
+                vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
+                vo.setAvatar(user.getAvatar());
+            } else {
+                vo.setNickname("匿名用户");
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     @PostMapping
@@ -129,41 +173,8 @@ public class FeedbackController {
         }
 
         List<Feedback> feedbacks = feedbackMapper.selectList(query);
-
-        List<FeedbackVO> voList = feedbacks.stream().map(fb -> {
-            FeedbackVO vo = new FeedbackVO();
-            vo.setId(fb.getId());
-            vo.setOrderId(fb.getOrderId());
-            vo.setUserId(fb.getUserId());
-            vo.setProductId(fb.getProductId());
-            vo.setRating(fb.getRating());
-            vo.setContent(fb.getContent());
-            vo.setCreateTime(fb.getCreateTime());
-
-            if (fb.getImages() != null && !fb.getImages().isEmpty()) {
-                try {
-                    vo.setImages(Arrays.asList(fb.getImages().split(",")));
-                } catch (Exception e) {
-                    vo.setImages(Collections.emptyList());
-                }
-            } else {
-                vo.setImages(Collections.emptyList());
-            }
-
-            try {
-                User user = userService.getById(fb.getUserId());
-                if (user != null) {
-                    vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
-                    vo.setAvatar(user.getAvatar());
-                }
-            } catch (Exception e) {
-                vo.setNickname("匿名用户");
-            }
-
-            return vo;
-        }).collect(Collectors.toList());
-
-        return Result.success(voList);
+        Map<Long, User> userMap = batchGetUsers(feedbacks);
+        return Result.success(convertToVOList(feedbacks, userMap));
     }
 
     @GetMapping("/order/{orderId}")
@@ -181,41 +192,8 @@ public class FeedbackController {
                 new LambdaQueryWrapper<Feedback>()
                         .eq(Feedback::getOrderId, orderId)
                         .orderByDesc(Feedback::getCreateTime));
-
-        List<FeedbackVO> voList = feedbacks.stream().map(fb -> {
-            FeedbackVO vo = new FeedbackVO();
-            vo.setId(fb.getId());
-            vo.setOrderId(fb.getOrderId());
-            vo.setUserId(fb.getUserId());
-            vo.setProductId(fb.getProductId());
-            vo.setRating(fb.getRating());
-            vo.setContent(fb.getContent());
-            vo.setCreateTime(fb.getCreateTime());
-
-            if (fb.getImages() != null && !fb.getImages().isEmpty()) {
-                try {
-                    vo.setImages(Arrays.asList(fb.getImages().split(",")));
-                } catch (Exception e) {
-                    vo.setImages(Collections.emptyList());
-                }
-            } else {
-                vo.setImages(Collections.emptyList());
-            }
-
-            try {
-                User user = userService.getById(fb.getUserId());
-                if (user != null) {
-                    vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
-                    vo.setAvatar(user.getAvatar());
-                }
-            } catch (Exception e) {
-                vo.setNickname("匿名用户");
-            }
-
-            return vo;
-        }).collect(Collectors.toList());
-
-        return Result.success(voList);
+        Map<Long, User> userMap = batchGetUsers(feedbacks);
+        return Result.success(convertToVOList(feedbacks, userMap));
     }
 
     @PostMapping("/upload")
