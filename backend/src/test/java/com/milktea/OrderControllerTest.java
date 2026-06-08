@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.controller.OrderController;
 import com.milktea.entity.*;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
@@ -107,7 +108,7 @@ class OrderControllerTest {
         testOrder.setOrderSn("TEST123456");
         testOrder.setUserId(1L);
         testOrder.setTotalAmount(new BigDecimal("30.00"));
-        testOrder.setStatus(1);
+        testOrder.setStatus(OrderStatus.PREPARING);
 
         testOrderItem = new OrderItem();
         testOrderItem.setId(1L);
@@ -168,6 +169,7 @@ class OrderControllerTest {
         
         assertTrue(result.isSuccess());
         assertNotNull(result.getData());
+        assertEquals(OrderStatus.PENDING_PAYMENT, result.getData().getStatus());
         verify(orderMapper, times(1)).insert(any(Order.class));
         verify(orderItemMapper, times(1)).insert(any(OrderItem.class));
         verify(cartItemMapper, times(1)).deleteById(1L);
@@ -270,7 +272,7 @@ class OrderControllerTest {
         setupUserAuthentication();
         when(orderMapper.selectById(999L)).thenReturn(null);
         
-        var result = orderController.updateStatus(999L, 2);
+        var result = orderController.updateStatus(999L, "DELIVERING");
         
         assertFalse(result.isSuccess());
         assertEquals("Order not found", result.getMessage());
@@ -282,7 +284,7 @@ class OrderControllerTest {
         setupUserAuthentication();
         when(orderMapper.selectById(1L)).thenReturn(testOrder);
         
-        var result = orderController.updateStatus(1L, 10);
+        var result = orderController.updateStatus(1L, "INVALID_STATUS");
         
         assertFalse(result.isSuccess());
         assertEquals("Invalid order status", result.getMessage());
@@ -295,14 +297,14 @@ class OrderControllerTest {
         Order cancelledOrder = new Order();
         cancelledOrder.setId(1L);
         cancelledOrder.setUserId(1L);
-        cancelledOrder.setStatus(3);
+        cancelledOrder.setStatus(OrderStatus.CANCELLED);
         
         when(orderMapper.selectById(1L)).thenReturn(cancelledOrder);
         
-        var result = orderController.updateStatus(1L, 2);
+        var result = orderController.updateStatus(1L, "DELIVERING");
         
         assertFalse(result.isSuccess());
-        assertEquals("Cannot update status of cancelled order", result.getMessage());
+        assertTrue(result.getMessage().contains("已取消"));
     }
 
     @Test
@@ -312,14 +314,14 @@ class OrderControllerTest {
         Order reviewedOrder = new Order();
         reviewedOrder.setId(1L);
         reviewedOrder.setUserId(1L);
-        reviewedOrder.setStatus(5);
+        reviewedOrder.setStatus(OrderStatus.REVIEWED);
         
         when(orderMapper.selectById(1L)).thenReturn(reviewedOrder);
         
-        var result = orderController.updateStatus(1L, 2);
+        var result = orderController.updateStatus(1L, "DELIVERING");
         
         assertFalse(result.isSuccess());
-        assertEquals("Cannot update status of reviewed order", result.getMessage());
+        assertTrue(result.getMessage().contains("已评价"));
     }
 
     @Test
@@ -329,7 +331,7 @@ class OrderControllerTest {
         Order order = new Order();
         order.setId(1L);
         order.setUserId(1L);
-        order.setStatus(1);
+        order.setStatus(OrderStatus.PREPARING);
         order.setPayAmount(new BigDecimal("30.00"));
         
         when(orderMapper.selectById(1L)).thenReturn(order);
@@ -339,7 +341,7 @@ class OrderControllerTest {
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
         when(orderCancelLogMapper.insert(any(OrderCancelLog.class))).thenReturn(1);
         
-        var result = orderController.updateStatus(1L, 3);
+        var result = orderController.updateStatus(1L, "CANCELLED");
         
         assertTrue(result.isSuccess());
         verify(productService, times(1)).restoreStock(1L, 2);
@@ -353,12 +355,12 @@ class OrderControllerTest {
         Order order = new Order();
         order.setId(1L);
         order.setUserId(1L);
-        order.setStatus(2);
+        order.setStatus(OrderStatus.DELIVERING);
         
         when(orderMapper.selectById(1L)).thenReturn(order);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
         
-        var result = orderController.updateStatus(1L, 4);
+        var result = orderController.updateStatus(1L, "COMPLETED");
         
         assertTrue(result.isSuccess());
     }
@@ -370,29 +372,29 @@ class OrderControllerTest {
         Order order = new Order();
         order.setId(1L);
         order.setUserId(1L);
-        order.setStatus(1);
+        order.setStatus(OrderStatus.PREPARING);
         
         when(orderMapper.selectById(1L)).thenReturn(order);
         
-        var result = orderController.updateStatus(1L, 4);
+        var result = orderController.updateStatus(1L, "COMPLETED");
         
         assertFalse(result.isSuccess());
         assertEquals("Invalid status transition", result.getMessage());
     }
 
     @Test
-    @DisplayName("测试 updateStatus - 管理员可以进行任何状态转换")
-    void testUpdateStatus_AdminCanDoAnyTransition() {
+    @DisplayName("测试 updateStatus - 管理员可以进行合法的状态转换")
+    void testUpdateStatus_AdminCanDoAllowedTransition() {
         setupAdminAuthentication();
         Order order = new Order();
         order.setId(1L);
         order.setUserId(1L);
-        order.setStatus(1);
+        order.setStatus(OrderStatus.PREPARING);
         
         when(orderMapper.selectById(1L)).thenReturn(order);
         when(orderMapper.updateById(any(Order.class))).thenReturn(1);
         
-        var result = orderController.updateStatus(1L, 4);
+        var result = orderController.updateStatus(1L, "DELIVERING");
         
         assertTrue(result.isSuccess());
     }

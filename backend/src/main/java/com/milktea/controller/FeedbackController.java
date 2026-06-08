@@ -6,6 +6,7 @@ import com.milktea.dto.FeedbackVO;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
 import com.milktea.entity.User;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.FeedbackMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -120,7 +121,7 @@ public class FeedbackController {
             return Result.error("Not authorized to submit feedback for this order");
         }
 
-        if (existingOrder.getStatus() != 4) {
+        if (existingOrder.getStatus() != OrderStatus.COMPLETED) {
             return Result.error("Only completed orders can be reviewed");
         }
 
@@ -146,7 +147,7 @@ public class FeedbackController {
 
         Order order = new Order();
         order.setId(orderId);
-        order.setStatus(5);
+        order.setStatus(OrderStatus.REVIEWED);
         orderMapper.updateById(order);
 
         logger.info("订单评价成功: orderId={}, userId={}, 评价商品数={}", orderId, userId, feedbacks.size());

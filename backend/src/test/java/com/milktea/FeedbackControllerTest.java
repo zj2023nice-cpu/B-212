@@ -5,6 +5,7 @@ import com.milktea.controller.FeedbackController;
 import com.milktea.entity.Feedback;
 import com.milktea.entity.Order;
 import com.milktea.entity.User;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.FeedbackMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -66,7 +67,7 @@ class FeedbackControllerTest {
         testOrder.setUserId(1L);
         testOrder.setOrderSn("TEST123");
         testOrder.setTotalAmount(new BigDecimal("30.00"));
-        testOrder.setStatus(4);
+        testOrder.setStatus(OrderStatus.COMPLETED);
 
         testFeedback = new Feedback();
         testFeedback.setId(1L);
@@ -113,7 +114,7 @@ class FeedbackControllerTest {
         Order otherUserOrder = new Order();
         otherUserOrder.setId(2L);
         otherUserOrder.setUserId(999L);
-        otherUserOrder.setStatus(4);
+        otherUserOrder.setStatus(OrderStatus.COMPLETED);
 
         Feedback feedback = new Feedback();
         feedback.setOrderId(2L);
@@ -158,7 +159,7 @@ class FeedbackControllerTest {
         Order pendingOrder = new Order();
         pendingOrder.setId(1L);
         pendingOrder.setUserId(1L);
-        pendingOrder.setStatus(2);
+        pendingOrder.setStatus(OrderStatus.DELIVERING);
 
         Feedback feedback = new Feedback();
         feedback.setOrderId(1L);
@@ -208,7 +209,7 @@ class FeedbackControllerTest {
         feedbackController.submitFeedbacks(Arrays.asList(feedback));
 
         verify(orderMapper).updateById(argThat(order ->
-            order.getStatus() == 5
+            order.getStatus() == OrderStatus.REVIEWED
         ));
     }
 
@@ -379,7 +380,7 @@ class FeedbackControllerTest {
 
         verify(orderMapper).updateById(argThat(order ->
             order.getId().equals(1L) &&
-            order.getStatus() == 5
+            order.getStatus() == OrderStatus.REVIEWED
         ));
     }
 

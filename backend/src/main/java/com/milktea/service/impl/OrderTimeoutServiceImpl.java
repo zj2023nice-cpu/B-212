@@ -5,6 +5,7 @@ import com.milktea.config.OrderTimeoutProperties;
 import com.milktea.entity.Order;
 import com.milktea.entity.OrderCancelLog;
 import com.milktea.entity.OrderItem;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.OrderCancelLogMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -86,7 +87,7 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
 
         restoreOrderStock(order.getId());
 
-        if (order.getStatus() != 0) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             try {
                 memberService.deductPoints(order.getUserId(), order.getId(), order.getPayAmount());
             } catch (Exception e) {

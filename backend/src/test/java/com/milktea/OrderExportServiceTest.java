@@ -7,6 +7,7 @@ import com.milktea.entity.ExportAuditLog;
 import com.milktea.entity.Order;
 import com.milktea.entity.OrderItem;
 import com.milktea.entity.User;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.ExportAuditLogMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -67,7 +68,7 @@ class OrderExportServiceTest {
         OrderExportDTO dto = new OrderExportDTO();
         dto.setStartDate("2026-06-01");
         dto.setEndDate("2026-06-08");
-        dto.setStatus(1);
+        dto.setStatus("PREPARING");
 
         Order order1 = buildOrder(1L, "SN001", 101L, LocalDateTime.of(2026, 6, 8, 10, 0, 0));
         Order order2 = buildOrder(2L, "SN002", 102L, LocalDateTime.of(2026, 6, 8, 9, 59, 0));
@@ -145,7 +146,7 @@ class OrderExportServiceTest {
         order.setOrderSn(orderSn);
         order.setUserId(userId);
         order.setCreateTime(createTime);
-        order.setStatus(1);
+        order.setStatus(OrderStatus.PREPARING);
         order.setTotalAmount(new BigDecimal("30.00"));
         order.setDiscountAmount(new BigDecimal("3.00"));
         order.setPayAmount(new BigDecimal("27.00"));

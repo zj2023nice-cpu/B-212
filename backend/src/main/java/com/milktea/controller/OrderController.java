@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.milktea.common.Result;
 import com.milktea.entity.*;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.*;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
@@ -11,6 +12,7 @@ import com.milktea.service.CouponService;
 import com.milktea.service.MemberService;
 import com.milktea.service.AddressService;
 import com.milktea.service.NotificationService;
+import com.milktea.statemachine.OrderStateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -147,7 +149,7 @@ public class OrderController {
         order.setDiscountAmount(discountAmount);
         order.setPayAmount(payAmount);
         order.setUserCouponId(userCouponId);
-        order.setStatus(0);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setRemark(orderReq.getRemark());
 
         if (orderReq.getAddressId() != null) {
@@ -247,13 +249,18 @@ public class OrderController {
     public Result<Page<Order>> adminListOrders(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         Page<Order> pageParam = new Page<>(page, pageSize);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
-        if (status != null) {
-            wrapper.eq(Order::getStatus, status);
+        if (status != null && !status.isEmpty()) {
+            try {
+                OrderStatus orderStatus = OrderStatus.valueOf(status);
+                wrapper.eq(Order::getStatus, orderStatus);
+            } catch (IllegalArgumentException e) {
+                return Result.error("Invalid order status");
+            }
         }
         if (startDate != null && !startDate.isEmpty()) {
             wrapper.ge(Order::getCreateTime, java.time.LocalDate.parse(startDate).atStartOfDay());
@@ -284,7 +291,7 @@ public class OrderController {
 
     @PutMapping("/{id}/status")
     @Transactional(rollbackFor = Exception.class)
-    public Result<String> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<String> updateStatus(@PathVariable Long id, @RequestParam String status) {
         Long currentUserId = getCurrentUserId();
         boolean isAdmin = isCurrentUserAdmin();
         Order existingOrder = orderMapper.selectById(id);
@@ -296,46 +303,35 @@ public class OrderController {
         if (!isAdmin && !existingOrder.getUserId().equals(currentUserId)) {
             return Result.error("Not authorized to update this order");
         }
-        
-        if (status < 0 || status > 5) {
+
+        OrderStatus targetStatus;
+        try {
+            targetStatus = OrderStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
             return Result.error("Invalid order status");
         }
         
-        Integer currentStatus = existingOrder.getStatus();
+        OrderStatus currentStatus = existingOrder.getStatus();
         
-        if (currentStatus == 3) {
-            return Result.error("Cannot update status of cancelled order");
-        }
-        
-        if (currentStatus == 5) {
-            return Result.error("Cannot update status of reviewed order");
+        if (currentStatus.isTerminal()) {
+            return Result.error("Cannot update status of " + currentStatus.getDescription() + " order");
         }
         
         if (!isAdmin) {
-            boolean isAllowedTransition = false;
-            
-            if (status == 1 && currentStatus == 0) {
-                isAllowedTransition = true;
+            if (!OrderStateMachine.isUserAllowedTransition(currentStatus, targetStatus)) {
+                return Result.error("Invalid status transition");
             }
-            
-            if (status == 3 && (currentStatus == 0 || currentStatus == 1 || currentStatus == 2)) {
-                isAllowedTransition = true;
-            }
-            
-            if (status == 4 && currentStatus == 2) {
-                isAllowedTransition = true;
-            }
-            
-            if (!isAllowedTransition) {
+        } else {
+            if (!OrderStateMachine.canTransit(currentStatus, targetStatus)) {
                 return Result.error("Invalid status transition");
             }
         }
 
         boolean notificationSent = false;
 
-        if (status == 1 && currentStatus == 0) {
+        if (targetStatus == OrderStatus.PAID && currentStatus == OrderStatus.PENDING_PAYMENT) {
             Order refreshed = orderMapper.selectById(id);
-            if (refreshed.getStatus() != 0) {
+            if (refreshed.getStatus() != OrderStatus.PENDING_PAYMENT) {
                 return Result.error("Order status has changed, please refresh");
             }
             try {
@@ -346,7 +342,7 @@ public class OrderController {
             logger.info("订单已支付: orderId={}, userId={}", id, existingOrder.getUserId());
             try {
                 notificationService.sendNotification(existingOrder.getUserId(), "订单已支付",
-                        "您的订单 " + existingOrder.getOrderSn() + " 已支付成功，正在制作中",
+                        "您的订单 " + existingOrder.getOrderSn() + " 已支付成功",
                         "ORDER", id);
                 notificationSent = true;
             } catch (Exception e) {
@@ -354,10 +350,10 @@ public class OrderController {
             }
         }
 
-        if (status == 3 && currentStatus != 3) {
+        if (targetStatus == OrderStatus.CANCELLED) {
             try {
                 restoreOrderStock(id);
-                if (currentStatus != 0) {
+                if (currentStatus != OrderStatus.PENDING_PAYMENT) {
                     try {
                         memberService.deductPoints(existingOrder.getUserId(), id, existingOrder.getPayAmount());
                     } catch (Exception e) {
@@ -367,7 +363,7 @@ public class OrderController {
                 String cancelReason = "用户主动取消";
                 Order orderToUpdate = new Order();
                 orderToUpdate.setId(id);
-                orderToUpdate.setStatus(status);
+                orderToUpdate.setStatus(targetStatus);
                 orderToUpdate.setCancelReason(cancelReason);
                 orderMapper.updateById(orderToUpdate);
 
@@ -395,14 +391,13 @@ public class OrderController {
         
         Order order = new Order();
         order.setId(id);
-        order.setStatus(status);
+        order.setStatus(targetStatus);
         orderMapper.updateById(order);
 
         if (!notificationSent) {
             try {
-                String statusText = getOrderStatusText(status);
                 notificationService.sendNotification(existingOrder.getUserId(), "订单状态变更",
-                        "您的订单 " + existingOrder.getOrderSn() + " 状态已更新为：" + statusText,
+                        "您的订单 " + existingOrder.getOrderSn() + " 状态已更新为：" + targetStatus.getDescription(),
                         "ORDER", id);
             } catch (Exception e) {
                 logger.warn("发送订单状态变更通知失败: orderId={}, reason={}", id, e.getMessage());
@@ -410,18 +405,6 @@ public class OrderController {
         }
 
         return Result.success("Status updated");
-    }
-
-    private String getOrderStatusText(Integer status) {
-        switch (status) {
-            case 0: return "待支付";
-            case 1: return "制作中";
-            case 2: return "配送中";
-            case 3: return "已取消";
-            case 4: return "已送达";
-            case 5: return "已评价";
-            default: return "未知状态";
-        }
     }
 
     private void restoreOrderStock(Long orderId) {

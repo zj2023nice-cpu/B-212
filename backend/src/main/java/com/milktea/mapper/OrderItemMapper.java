@@ -23,7 +23,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
             "JOIN categories c ON p.category_id = c.id " +
-            "WHERE o.status NOT IN (0, 3) " +
+            "WHERE o.status NOT IN ('PENDING_PAYMENT', 'CANCELLED') " +
             "AND o.create_time &gt;= #{startDate} " +
             "AND p.status = 1 " +
             "<if test='categoryId != null'>" +
@@ -54,7 +54,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
             "JOIN categories c ON p.category_id = c.id " +
-            "WHERE o.status NOT IN (0, 3) " +
+            "WHERE o.status NOT IN ('PENDING_PAYMENT', 'CANCELLED') " +
             "AND o.create_time &gt;= #{startDate} " +
             "AND p.status = 1 " +
             "AND p.category_id IN " +

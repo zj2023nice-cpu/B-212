@@ -32,7 +32,7 @@ public class OrderExportController {
     public void exportOrders(
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
-            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String status,
             Authentication authentication,
             HttpServletResponse response) {
 

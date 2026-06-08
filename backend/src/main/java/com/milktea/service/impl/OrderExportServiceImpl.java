@@ -11,6 +11,7 @@ import com.milktea.entity.ExportAuditLog;
 import com.milktea.entity.Order;
 import com.milktea.entity.OrderItem;
 import com.milktea.entity.User;
+import com.milktea.enums.OrderStatus;
 import com.milktea.mapper.ExportAuditLogMapper;
 import com.milktea.mapper.OrderItemMapper;
 import com.milktea.mapper.OrderMapper;
@@ -127,8 +128,13 @@ public class OrderExportServiceImpl implements OrderExportService {
             wrapper.le(Order::getCreateTime, endDateTime);
         }
 
-        if (dto.getStatus() != null) {
-            wrapper.eq(Order::getStatus, dto.getStatus());
+        if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
+            try {
+                OrderStatus orderStatus = OrderStatus.valueOf(dto.getStatus());
+                wrapper.eq(Order::getStatus, orderStatus);
+            } catch (IllegalArgumentException e) {
+                // ignore invalid status
+            }
         }
 
         wrapper.orderByDesc(Order::getCreateTime)
@@ -199,17 +205,9 @@ public class OrderExportServiceImpl implements OrderExportService {
         return vo;
     }
 
-    private String getStatusText(Integer status) {
+    private String getStatusText(OrderStatus status) {
         if (status == null) return "未知";
-        switch (status) {
-            case 0: return "待支付";
-            case 1: return "制作中";
-            case 2: return "配送中";
-            case 3: return "已取消";
-            case 4: return "已送达";
-            case 5: return "已评价";
-            default: return "未知状态";
-        }
+        return status.getDescription();
     }
 
     private void saveAuditLog(OrderExportDTO dto, Long operatorId, String operatorName, int exportCount) {
@@ -220,7 +218,8 @@ public class OrderExportServiceImpl implements OrderExportService {
             auditLog.setExportType("ORDER_EXPORT");
             auditLog.setFilterStartDate(dto.getStartDate());
             auditLog.setFilterEndDate(dto.getEndDate());
-            auditLog.setFilterStatus(dto.getStatus() != null ? getStatusText(dto.getStatus()) : "全部");
+            auditLog.setFilterStatus(dto.getStatus() != null && !dto.getStatus().isEmpty()
+                    ? OrderStatus.valueOf(dto.getStatus()).getDescription() : "全部");
             auditLog.setExportCount(exportCount);
             exportAuditLogMapper.insert(auditLog);
         } catch (Exception e) {

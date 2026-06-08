@@ -8,13 +8,14 @@
     </div>
 
     <div v-if="isAdmin" class="mb-4 flex flex-wrap gap-3 items-center">
-      <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 140px" @change="handleFilterChange">
-        <el-option label="待支付" :value="0" />
-        <el-option label="制作中" :value="1" />
-        <el-option label="配送中" :value="2" />
-        <el-option label="已取消" :value="3" />
-        <el-option label="已送达" :value="4" />
-        <el-option label="已评价" :value="5" />
+      <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 160px" @change="handleFilterChange">
+        <el-option label="待支付" value="PENDING_PAYMENT" />
+        <el-option label="已支付" value="PAID" />
+        <el-option label="制作中" value="PREPARING" />
+        <el-option label="配送中" value="DELIVERING" />
+        <el-option label="已取消" value="CANCELLED" />
+        <el-option label="已送达" value="COMPLETED" />
+        <el-option label="已评价" value="REVIEWED" />
       </el-select>
       <el-date-picker
         v-model="filterDateRange"
@@ -55,7 +56,7 @@
             <div class="text-xs text-gray-400">
               {{ formatDate(order.createTime) }}
             </div>
-            <div v-if="order.status === 3 && order.cancelReason" class="text-xs text-red-400 mt-1">
+            <div v-if="order.status === 'CANCELLED' && order.cancelReason" class="text-xs text-red-400 mt-1">
               {{ order.cancelReason }}
             </div>
           </div>
@@ -63,14 +64,14 @@
 
         <div class="mt-4 flex justify-end gap-3">
           <el-button
-            v-if="order.status === 0"
+            v-if="order.status === 'PENDING_PAYMENT'"
             type="primary"
             size="small"
             @click.stop="handlePay(order)"
             >去支付</el-button
           >
           <el-button
-            v-if="order.status === 4"
+            v-if="order.status === 'COMPLETED'"
             type="primary"
             plain
             size="small"
@@ -78,7 +79,7 @@
             >待评价</el-button
           >
           <el-button
-            v-if="order.status === 0 || order.status === 1 || order.status === 2"
+            v-if="['PENDING_PAYMENT', 'PAID', 'PREPARING', 'DELIVERING'].includes(order.status)"
             type="danger"
             plain
             size="small"
@@ -135,12 +136,13 @@
         </el-form-item>
         <el-form-item label="订单状态">
           <el-select v-model="exportStatus" placeholder="全部状态" clearable style="width: 100%">
-            <el-option label="待支付" :value="0" />
-            <el-option label="制作中" :value="1" />
-            <el-option label="配送中" :value="2" />
-            <el-option label="已取消" :value="3" />
-            <el-option label="已送达" :value="4" />
-            <el-option label="已评价" :value="5" />
+            <el-option label="待支付" value="PENDING_PAYMENT" />
+            <el-option label="已支付" value="PAID" />
+            <el-option label="制作中" value="PREPARING" />
+            <el-option label="配送中" value="DELIVERING" />
+            <el-option label="已取消" value="CANCELLED" />
+            <el-option label="已送达" value="COMPLETED" />
+            <el-option label="已评价" value="REVIEWED" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -179,29 +181,18 @@ const exportDateRange = ref(null)
 const exportStatus = ref(null)
 const exportLoading = ref(false)
 
-const getStatusText = status => {
-  const map = {
-    0: '待支付',
-    1: '制作中',
-    2: '配送中',
-    3: '已取消',
-    4: '已送达',
-    5: '已评价'
-  }
-  return map[status]
+const STATUS_MAP = {
+  PENDING_PAYMENT: { text: '待支付', type: 'warning' },
+  PAID: { text: '已支付', type: '' },
+  PREPARING: { text: '制作中', type: 'primary' },
+  DELIVERING: { text: '配送中', type: 'primary' },
+  COMPLETED: { text: '已送达', type: 'success' },
+  CANCELLED: { text: '已取消', type: 'danger' },
+  REVIEWED: { text: '已评价', type: 'success' }
 }
 
-const getStatusType = status => {
-  const map = {
-    0: 'warning',
-    1: 'primary',
-    2: 'primary',
-    3: 'danger',
-    4: 'success',
-    5: 'success'
-  }
-  return map[status]
-}
+const getStatusText = status => STATUS_MAP[status]?.text || '未知状态'
+const getStatusType = status => STATUS_MAP[status]?.type || 'info'
 
 const formatDate = dateStr => {
   return new Date(dateStr).toLocaleString()
@@ -214,8 +205,8 @@ const openCancelDialog = order => {
 
 const handlePay = async order => {
   try {
-    await updateOrderStatus(order.id, 1)
-    ElMessage.success('支付成功，订单制作中')
+    await updateOrderStatus(order.id, 'PAID')
+    ElMessage.success('支付成功')
     fetchOrders()
   } catch (error) {
     ElMessage.error('支付失败：' + (error.response?.data?.message || error.message))
@@ -224,7 +215,7 @@ const handlePay = async order => {
 
 const handleCancelOrder = async () => {
   try {
-    await updateOrderStatus(currentOrder.value.id, 3)
+    await updateOrderStatus(currentOrder.value.id, 'CANCELLED')
     ElMessage.success('订单已取消')
     cancelVisible.value = false
     fetchOrders()
