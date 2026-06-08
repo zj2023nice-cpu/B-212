@@ -9,4 +9,5 @@ public interface UserService extends IService<User> {
     String login(LoginDTO loginDTO);
     void register(RegisterDTO registerDTO);
     User getByUsername(String username);
+    void updateAvatar(Long userId, String avatarUrl);
 }

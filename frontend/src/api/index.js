@@ -3,6 +3,7 @@ import request from './request'
 export const login = (data) => request.post('/auth/login', data)
 export const register = (data) => request.post('/auth/register', data)
 export const getMe = () => request.get('/auth/me')
+export const uploadAvatar = (formData) => request.post('/auth/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 export const getCategories = () => request.get('/categories')
 export const getProducts = (params) => request.get('/products', { params })

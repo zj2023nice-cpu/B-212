@@ -4,15 +4,24 @@
 
     <div class="glass-card p-6 mb-6 member-card" :class="'level-' + memberInfo.level">
       <div class="flex items-center justify-between">
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="level-badge">{{ memberInfo.levelName }}</span>
-            <span v-if="memberInfo.discountRate > 0" class="text-sm text-white/80">
-              享受 {{ (memberInfo.discountRate * 100).toFixed(0) }}% 折扣
-            </span>
+        <div class="flex items-center gap-4">
+          <div class="avatar-wrapper" @click="triggerUpload">
+            <el-avatar :size="72" :src="avatarFullUrl">
+              <span class="text-2xl">{{ userStore.user?.nickname?.charAt(0) || 'U' }}</span>
+            </el-avatar>
+            <div class="avatar-overlay">
+              <el-icon color="white" :size="20"><Camera /></el-icon>
+            </div>
           </div>
-          <div class="text-white text-3xl font-bold mb-1">{{ memberInfo.currentPoints }}</div>
-          <div class="text-white/70 text-sm">当前积分</div>
+          <div>
+            <div class="flex items-center gap-3 mb-1">
+              <span class="level-badge">{{ memberInfo.levelName }}</span>
+              <span v-if="memberInfo.discountRate > 0" class="text-sm text-white/80">
+                享受 {{ (memberInfo.discountRate * 100).toFixed(0) }}% 折扣
+              </span>
+            </div>
+            <div class="text-white text-xl font-bold">{{ userStore.user?.nickname || '用户' }}</div>
+          </div>
         </div>
         <div class="text-right">
           <div class="text-white/70 text-sm mb-1">累计积分</div>
@@ -40,6 +49,30 @@
         已达到最高等级
       </div>
     </div>
+
+    <el-upload
+      ref="uploadRef"
+      :show-file-list="false"
+      :before-upload="beforeUpload"
+      :http-request="handleUploadRequest"
+      accept="image/jpeg,image/png"
+      class="hidden-upload"
+    >
+    </el-upload>
+
+    <el-dialog v-model="cropDialogVisible" title="裁剪头像" width="420px" :close-on-click-modal="false" destroy-on-close>
+      <div class="crop-container" ref="cropContainerRef">
+        <canvas ref="cropCanvasRef" class="crop-canvas" @mousedown="onCropStart" @mousemove="onCropMove" @mouseup="onCropEnd" @mouseleave="onCropEnd"></canvas>
+        <div v-if="cropImageSrc" class="crop-preview-box">
+          <div class="crop-preview-label">预览</div>
+          <canvas ref="previewCanvasRef" class="crop-preview-canvas"></canvas>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="cropDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploading" @click="confirmCrop">确认上传</el-button>
+      </template>
+    </el-dialog>
 
     <div class="grid grid-cols-4 gap-4 mb-6">
       <div
@@ -95,8 +128,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { getMemberLevel, getPointsRecords } from '@/api'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { getMemberLevel, getPointsRecords, uploadAvatar } from '@/api'
+import { useUserStore } from '@/store/user'
+import { ElMessage } from 'element-plus'
+
+const userStore = useUserStore()
 
 const memberInfo = ref({
   level: 0,
@@ -114,6 +151,37 @@ const pointsRecords = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
+const uploading = ref(false)
+const uploadRef = ref(null)
+const cropDialogVisible = ref(false)
+const cropCanvasRef = ref(null)
+const previewCanvasRef = ref(null)
+const cropContainerRef = ref(null)
+const cropImageSrc = ref(null)
+
+let cropImage = null
+let cropState = {
+  imgX: 0,
+  imgY: 0,
+  imgW: 0,
+  imgH: 0,
+  boxX: 0,
+  boxY: 0,
+  boxSize: 200,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  boxStartX: 0,
+  boxStartY: 0
+}
+
+const avatarFullUrl = computed(() => {
+  const avatar = userStore.user?.avatar
+  if (!avatar) return ''
+  if (avatar.startsWith('http')) return avatar
+  return avatar
+})
 
 const levelList = [
   { level: 0, name: '普通会员', icon: '🥤', threshold: 0, discount: '0%' },
@@ -152,6 +220,218 @@ const fetchPointsRecords = async () => {
   total.value = data.total
 }
 
+const triggerUpload = () => {
+  const input = uploadRef.value?.$el?.querySelector('input[type="file"]')
+  if (input) input.click()
+}
+
+const beforeUpload = (file) => {
+  const isJpgOrPng = ['image/jpeg', 'image/png'].includes(file.type)
+  if (!isJpgOrPng) {
+    ElMessage.error('只支持 JPG/PNG 格式的图片')
+    return false
+  }
+  const isLt2M = file.size / 1024 / 1024 < 2
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB')
+    return false
+  }
+  return true
+}
+
+const handleUploadRequest = async ({ file }) => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    cropImageSrc.value = e.target.result
+    cropDialogVisible.value = true
+    nextTick(() => initCropCanvas(file))
+  }
+  reader.readAsDataURL(file)
+}
+
+const initCropCanvas = (file) => {
+  const canvas = cropCanvasRef.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+
+  cropImage = new Image()
+  cropImage.onload = () => {
+    const maxW = 380
+    const maxH = 380
+    let w = cropImage.width
+    let h = cropImage.height
+    const ratio = Math.min(maxW / w, maxH / h, 1)
+    w = Math.round(w * ratio)
+    h = Math.round(h * ratio)
+
+    canvas.width = w
+    canvas.height = h
+
+    const boxSize = Math.min(w, h, 200)
+    cropState = {
+      imgX: 0,
+      imgY: 0,
+      imgW: w,
+      imgH: h,
+      boxX: (w - boxSize) / 2,
+      boxY: (h - boxSize) / 2,
+      boxSize: boxSize,
+      dragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      boxStartX: 0,
+      boxStartY: 0
+    }
+
+    drawCropCanvas()
+    drawPreview()
+  }
+  cropImage.src = cropImageSrc.value
+}
+
+const drawCropCanvas = () => {
+  const canvas = cropCanvasRef.value
+  if (!canvas || !cropImage) return
+  const ctx = canvas.getContext('2d')
+  const { imgX, imgY, imgW, imgH, boxX, boxY, boxSize } = cropState
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(cropImage, imgX, imgY, imgW, imgH)
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(boxX, boxY, boxSize, boxSize)
+  ctx.clip()
+  ctx.clearRect(boxX, boxY, boxSize, boxSize)
+  ctx.drawImage(cropImage, imgX, imgY, imgW, imgH)
+  ctx.restore()
+
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  ctx.strokeRect(boxX, boxY, boxSize, boxSize)
+
+  const third = boxSize / 3
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+  ctx.lineWidth = 1
+  for (let i = 1; i < 3; i++) {
+    ctx.beginPath()
+    ctx.moveTo(boxX + third * i, boxY)
+    ctx.lineTo(boxX + third * i, boxY + boxSize)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(boxX, boxY + third * i)
+    ctx.lineTo(boxX + boxSize, boxY + third * i)
+    ctx.stroke()
+  }
+}
+
+const drawPreview = () => {
+  const previewCanvas = previewCanvasRef.value
+  const cropCanvas = cropCanvasRef.value
+  if (!previewCanvas || !cropCanvas || !cropImage) return
+  const pCtx = previewCanvas.getContext('2d')
+  const previewSize = 120
+  previewCanvas.width = previewSize
+  previewCanvas.height = previewSize
+
+  const { boxX, boxY, boxSize } = cropState
+  const scaleX = cropImage.width / cropCanvas.width
+  const scaleY = cropImage.height / cropCanvas.height
+
+  pCtx.clearRect(0, 0, previewSize, previewSize)
+  pCtx.drawImage(
+    cropImage,
+    boxX * scaleX, boxY * scaleY,
+    boxSize * scaleX, boxSize * scaleY,
+    0, 0, previewSize, previewSize
+  )
+}
+
+const onCropStart = (e) => {
+  const rect = cropCanvasRef.value.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  const { boxX, boxY, boxSize } = cropState
+
+  if (x >= boxX && x <= boxX + boxSize && y >= boxY && y <= boxY + boxSize) {
+    cropState.dragging = true
+    cropState.dragStartX = x
+    cropState.dragStartY = y
+    cropState.boxStartX = boxX
+    cropState.boxStartY = boxY
+  }
+}
+
+const onCropMove = (e) => {
+  if (!cropState.dragging) return
+  const rect = cropCanvasRef.value.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  const dx = x - cropState.dragStartX
+  const dy = y - cropState.dragStartY
+
+  cropState.boxX = Math.max(0, Math.min(cropState.imgW - cropState.boxSize, cropState.boxStartX + dx))
+  cropState.boxY = Math.max(0, Math.min(cropState.imgH - cropState.boxSize, cropState.boxStartY + dy))
+
+  drawCropCanvas()
+  drawPreview()
+}
+
+const onCropEnd = () => {
+  cropState.dragging = false
+}
+
+const confirmCrop = async () => {
+  if (!cropCanvasRef.value || !cropImage) return
+
+  const { boxX, boxY, boxSize } = cropState
+  const scaleX = cropImage.width / cropCanvasRef.value.width
+  const scaleY = cropImage.height / cropCanvasRef.value.height
+
+  const outputSize = 256
+  const tempCanvas = document.createElement('canvas')
+  tempCanvas.width = outputSize
+  tempCanvas.height = outputSize
+  const tempCtx = tempCanvas.getContext('2d')
+
+  tempCtx.drawImage(
+    cropImage,
+    boxX * scaleX, boxY * scaleY,
+    boxSize * scaleX, boxSize * scaleY,
+    0, 0, outputSize, outputSize
+  )
+
+  uploading.value = true
+  try {
+    tempCanvas.toBlob(async (blob) => {
+      if (!blob) {
+        ElMessage.error('裁剪失败，请重试')
+        uploading.value = false
+        return
+      }
+      const formData = new FormData()
+      formData.append('file', blob, 'avatar.png')
+
+      try {
+        const data = await uploadAvatar(formData)
+        userStore.updateAvatar(data.avatarUrl)
+        cropDialogVisible.value = false
+        ElMessage.success('头像更新成功')
+      } catch (err) {
+        console.error('头像上传失败', err)
+      } finally {
+        uploading.value = false
+      }
+    }, 'image/png', 0.9)
+  } catch (err) {
+    console.error('裁剪失败', err)
+    uploading.value = false
+  }
+}
+
 onMounted(async () => {
   await fetchMemberInfo()
   await fetchPointsRecords()
@@ -181,5 +461,54 @@ onMounted(async () => {
   border-radius: 20px;
   font-size: 14px;
   font-weight: bold;
+}
+.avatar-wrapper {
+  position: relative;
+  cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.avatar-wrapper:hover .avatar-overlay {
+  opacity: 1;
+}
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+.hidden-upload {
+  display: none;
+}
+.crop-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  justify-content: center;
+}
+.crop-canvas {
+  cursor: move;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+.crop-preview-box {
+  text-align: center;
+}
+.crop-preview-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+.crop-preview-canvas {
+  border-radius: 50%;
+  border: 2px solid #e4e7ed;
 }
 </style>

@@ -41,3 +41,8 @@ order:
     minutes: 15
     cron-interval-seconds: 60
     cancel-reason: "超时未支付"
+
+app:
+  upload:
+    dir: uploads
+    avatar-dir: uploads/avatars

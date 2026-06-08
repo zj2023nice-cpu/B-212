@@ -16,10 +16,16 @@ public class AppConfig implements WebMvcConfigurer {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    @Value("${app.upload.avatar-dir:uploads/avatars}")
+    private String avatarUploadDir;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:" + uploadDir + "/");
+
+        registry.addResourceHandler("/uploads/avatars/**")
+                .addResourceLocations("file:" + avatarUploadDir + "/");
     }
 
     @Bean

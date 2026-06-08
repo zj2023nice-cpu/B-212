@@ -16,6 +16,12 @@ export const useUserStore = defineStore('user', {
       this.user = data
       localStorage.setItem('user', JSON.stringify(data))
     },
+    updateAvatar(avatarUrl) {
+      if (this.user) {
+        this.user = { ...this.user, avatar: avatarUrl }
+        localStorage.setItem('user', JSON.stringify(this.user))
+      }
+    },
     logout() {
       this.token = ''
       this.user = null
