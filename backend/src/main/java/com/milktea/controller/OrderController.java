@@ -279,7 +279,9 @@ public class OrderController {
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String orderSn,
+            @RequestParam(required = false) String productName) {
         Page<Order> pageParam = new Page<>(page, pageSize);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isEmpty()) {
@@ -295,6 +297,13 @@ public class OrderController {
         }
         if (endDate != null && !endDate.isEmpty()) {
             wrapper.le(Order::getCreateTime, java.time.LocalDate.parse(endDate).atTime(java.time.LocalTime.MAX));
+        }
+        if (orderSn != null && !orderSn.isEmpty()) {
+            wrapper.like(Order::getOrderSn, orderSn);
+        }
+        if (productName != null && !productName.isEmpty()) {
+            wrapper.exists("SELECT 1 FROM order_items WHERE order_items.order_id = orders.id AND product_name LIKE {0}",
+                    "%" + productName + "%");
         }
         wrapper.orderByDesc(Order::getCreateTime);
         return Result.success(orderMapper.selectPage(pageParam, wrapper));

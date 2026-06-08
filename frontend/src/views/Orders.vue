@@ -33,7 +33,6 @@
         clearable
         style="width: 180px"
         @clear="handleFilterChange"
-        @keyup.enter="handleFilterChange"
       />
       <el-input
         v-model="filterProductName"
@@ -41,7 +40,6 @@
         clearable
         style="width: 180px"
         @clear="handleFilterChange"
-        @keyup.enter="handleFilterChange"
       />
       <el-button type="primary" plain @click="resetFilters">重置筛选</el-button>
     </div>
@@ -173,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { getMyOrders, updateOrderStatus, adminListOrders, exportOrders } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Warning, Download } from '@element-plus/icons-vue'
@@ -334,6 +332,23 @@ const handleExport = async () => {
     exportLoading.value = false
   }
 }
+
+let debounceTimer = null
+
+const debouncedFilterChange = () => {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchOrders()
+  }, 400)
+}
+
+watch(filterOrderSn, () => debouncedFilterChange())
+watch(filterProductName, () => debouncedFilterChange())
+
+onUnmounted(() => {
+  clearTimeout(debounceTimer)
+})
 
 onMounted(fetchOrders)
 </script>
