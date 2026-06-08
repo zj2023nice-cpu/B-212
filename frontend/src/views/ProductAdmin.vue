@@ -120,6 +120,10 @@
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="3" />
         </el-form-item>
+        <el-form-item label="规格加价规则">
+          <el-input v-model="form.specPriceRules" type="textarea" :rows="3" placeholder='例: {"size":{"大杯":3},"topping":{"珍珠":2,"布丁":2}}' />
+          <div class="text-xs text-gray-400 mt-1">JSON 格式，定义杯型/加料等加价规则。size 为杯型加价，topping 为加料加价。留空表示无加价</div>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="form.status" style="width: 100%">
             <el-option label="上架" :value="1" />
@@ -162,6 +166,7 @@ const form = ref({
   lowStockThreshold: 10,
   image: '',
   description: '',
+  specPriceRules: '',
   status: 1
 })
 
@@ -212,6 +217,7 @@ const showCreateDialog = () => {
     lowStockThreshold: 10,
     image: '',
     description: '',
+    specPriceRules: '',
     status: 1
   }
   dialogVisible.value = true
@@ -228,6 +234,7 @@ const showEditDialog = (row) => {
     lowStockThreshold: row.lowStockThreshold || 10,
     image: row.image || '',
     description: row.description || '',
+    specPriceRules: row.specPriceRules || '',
     status: row.status
   }
   dialogVisible.value = true

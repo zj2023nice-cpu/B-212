@@ -18,7 +18,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
     @Select("<script>" +
             "SELECT oi.product_id AS productId, p.name AS productName, p.price AS price, " +
             "p.image AS image, p.description AS description, p.category_id AS categoryId, " +
-            "c.name AS categoryName, SUM(oi.quantity) AS totalSales " +
+            "c.name AS categoryName, SUM(oi.quantity) AS totalSales, p.spec_price_rules AS specPriceRules " +
             "FROM order_items oi " +
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
@@ -29,7 +29,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "<if test='categoryId != null'>" +
             "AND p.category_id = #{categoryId} " +
             "</if>" +
-            "GROUP BY oi.product_id, p.name, p.price, p.image, p.description, p.category_id, c.name " +
+            "GROUP BY oi.product_id, p.name, p.price, p.image, p.description, p.category_id, c.name, p.spec_price_rules " +
             "ORDER BY totalSales DESC " +
             "LIMIT #{limit}" +
             "</script>")
@@ -49,7 +49,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
     @Select("<script>" +
             "SELECT oi.product_id AS productId, p.name AS productName, p.price AS price, " +
             "p.image AS image, p.description AS description, p.category_id AS categoryId, " +
-            "c.name AS categoryName, SUM(oi.quantity) AS totalSales " +
+            "c.name AS categoryName, SUM(oi.quantity) AS totalSales, p.spec_price_rules AS specPriceRules " +
             "FROM order_items oi " +
             "JOIN orders o ON oi.order_id = o.id " +
             "JOIN products p ON oi.product_id = p.id " +
@@ -61,7 +61,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             "<foreach item='id' collection='categoryIds' open='(' separator=',' close=')'>" +
             "#{id}" +
             "</foreach>" +
-            "GROUP BY oi.product_id, p.name, p.price, p.image, p.description, p.category_id, c.name " +
+            "GROUP BY oi.product_id, p.name, p.price, p.image, p.description, p.category_id, c.name, p.spec_price_rules " +
             "ORDER BY totalSales DESC " +
             "LIMIT #{limit}" +
             "</script>")

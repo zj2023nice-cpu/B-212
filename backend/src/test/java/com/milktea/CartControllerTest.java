@@ -70,13 +70,15 @@ class CartControllerTest {
         testProduct.setName("珍珠奶茶");
         testProduct.setPrice(new BigDecimal("15.00"));
         testProduct.setStock(10);
+        testProduct.setSpecPriceRules("{\"size\":{\"大杯\":3},\"topping\":{\"珍珠\":2,\"布丁\":2}}");
 
         testCartItem = new CartItem();
         testCartItem.setId(1L);
         testCartItem.setUserId(1L);
         testCartItem.setProductId(1L);
         testCartItem.setQuantity(2);
-        testCartItem.setSpecs("中杯, 少糖");
+        testCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"少冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        testCartItem.setUnitPrice(new BigDecimal("15.00"));
 
         SecurityContextHolder.setContext(securityContext);
         when(securityContext.getAuthentication()).thenReturn(authentication);
@@ -122,14 +124,16 @@ class CartControllerTest {
         item1.setUserId(1L);
         item1.setProductId(1L);
         item1.setQuantity(2);
-        item1.setSpecs("中杯, 少糖");
+        item1.setSpecs("{\"size\":\"中杯\",\"temp\":\"少冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        item1.setUnitPrice(new BigDecimal("15.00"));
 
         CartItem item2 = new CartItem();
         item2.setId(2L);
         item2.setUserId(1L);
         item2.setProductId(1L);
         item2.setQuantity(1);
-        item2.setSpecs("大杯, 全糖");
+        item2.setSpecs("{\"size\":\"大杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[\"珍珠\"]}");
+        item2.setUnitPrice(new BigDecimal("20.00"));
 
         List<CartItem> cartItems = new ArrayList<>();
         cartItems.add(item1);
@@ -154,7 +158,7 @@ class CartControllerTest {
         CartItem newCartItem = new CartItem();
         newCartItem.setProductId(999L);
         newCartItem.setQuantity(1);
-        newCartItem.setSpecs("大杯");
+        newCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}");
         
         when(productMapper.selectById(999L)).thenReturn(null);
         
@@ -171,7 +175,8 @@ class CartControllerTest {
         CartItem newCartItem = new CartItem();
         newCartItem.setProductId(1L);
         newCartItem.setQuantity(1);
-        newCartItem.setSpecs("大杯");
+        newCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        newCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
@@ -193,12 +198,14 @@ class CartControllerTest {
         existingCartItem.setUserId(1L);
         existingCartItem.setProductId(1L);
         existingCartItem.setQuantity(2);
-        existingCartItem.setSpecs("大杯");
+        existingCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        existingCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         CartItem newCartItem = new CartItem();
         newCartItem.setProductId(1L);
         newCartItem.setQuantity(3);
-        newCartItem.setSpecs("大杯");
+        newCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        newCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existingCartItem);
@@ -218,7 +225,8 @@ class CartControllerTest {
         CartItem newCartItem = new CartItem();
         newCartItem.setProductId(1L);
         newCartItem.setQuantity(15);
-        newCartItem.setSpecs("大杯");
+        newCartItem.setSpecs("{\"size\":\"大杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[\"珍珠\"]}");
+        newCartItem.setUnitPrice(new BigDecimal("20.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
@@ -355,12 +363,14 @@ class CartControllerTest {
         existingCartItem.setUserId(1L);
         existingCartItem.setProductId(1L);
         existingCartItem.setQuantity(2);
-        existingCartItem.setSpecs("中杯");
+        existingCartItem.setSpecs("{\"size\":\"中杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[]}");
+        existingCartItem.setUnitPrice(new BigDecimal("15.00"));
         
         CartItem newCartItem = new CartItem();
         newCartItem.setProductId(1L);
         newCartItem.setQuantity(1);
-        newCartItem.setSpecs("大杯");
+        newCartItem.setSpecs("{\"size\":\"大杯\",\"temp\":\"常规冰\",\"sugar\":\"全糖\",\"topping\":[\"珍珠\"]}");
+        newCartItem.setUnitPrice(new BigDecimal("20.00"));
         
         when(productMapper.selectById(1L)).thenReturn(testProduct);
         when(cartItemMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);

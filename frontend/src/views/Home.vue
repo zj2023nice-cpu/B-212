@@ -212,6 +212,14 @@
         <div class="mb-6">
           <p class="text-sm font-bold text-gray-700 mb-3">规格选项</p>
           <div class="space-y-4">
+            <div v-if="sizeOptions.length > 0">
+              <p class="text-xs text-gray-400 mb-2">杯型</p>
+              <el-radio-group v-model="specs.size" size="small">
+                <el-radio-button v-for="opt in sizeOptions" :key="opt.label" :label="opt.label">
+                  {{ opt.label }}<span v-if="opt.markup > 0" class="ml-1 text-xs text-orange-500">+¥{{ opt.markup }}</span>
+                </el-radio-button>
+              </el-radio-group>
+            </div>
             <div>
               <p class="text-xs text-gray-400 mb-2">温度</p>
               <el-radio-group v-model="specs.temp" size="small">
@@ -231,11 +239,19 @@
                 <el-radio-button label="不另外加糖" />
               </el-radio-group>
             </div>
+            <div v-if="toppingOptions.length > 0">
+              <p class="text-xs text-gray-400 mb-2">加料</p>
+              <el-checkbox-group v-model="specs.topping" size="small">
+                <el-checkbox-button v-for="opt in toppingOptions" :key="opt.label" :label="opt.label">
+                  {{ opt.label }}<span class="ml-1 text-xs text-orange-500">+¥{{ opt.markup }}</span>
+                </el-checkbox-button>
+              </el-checkbox-group>
+            </div>
           </div>
         </div>
         <div class="border-t pt-4 flex items-center justify-between">
           <span class="text-xl font-bold text-primary"
-            >¥{{ currentProduct.price }}</span
+            >¥{{ calculatedPrice }}</span
           >
           <el-button type="primary" size="large" @click="handleAddToCart"
             >加入购物车</el-button
@@ -247,7 +263,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { getCategories, getProducts, getHotRanking, getRecommendation, addFavorite, removeFavorite, batchCheckFavorite } from '@/api'
 import { useCartStore } from '@/store/cart'
 import { ElMessage } from 'element-plus'
@@ -306,14 +322,61 @@ const fetchFavoriteStatus = async () => {
 }
 
 const specs = reactive({
+  size: '中杯',
   temp: '常规冰',
-  sugar: '全糖'
+  sugar: '全糖',
+  topping: []
+})
+
+const parseSpecRules = (rulesStr) => {
+  try {
+    return rulesStr ? JSON.parse(rulesStr) : {}
+  } catch (e) {
+    return {}
+  }
+}
+
+const sizeOptions = computed(() => {
+  const rules = parseSpecRules(currentProduct.value?.specPriceRules)
+  const sizeRules = rules.size || {}
+  const options = [{ label: '中杯', markup: 0 }]
+  Object.keys(sizeRules).forEach(key => {
+    options.push({ label: key, markup: Number(sizeRules[key]) })
+  })
+  return options
+})
+
+const toppingOptions = computed(() => {
+  const rules = parseSpecRules(currentProduct.value?.specPriceRules)
+  const toppingRules = rules.topping || {}
+  return Object.keys(toppingRules).map(key => ({
+    label: key,
+    markup: Number(toppingRules[key])
+  }))
+})
+
+const calculatedPrice = computed(() => {
+  if (!currentProduct.value) return '0.00'
+  const base = Number(currentProduct.value.price) || 0
+  const rules = parseSpecRules(currentProduct.value.specPriceRules)
+  let markup = 0
+  if (rules.size && specs.size) {
+    markup += Number(rules.size[specs.size] || 0)
+  }
+  if (rules.topping && specs.topping) {
+    specs.topping.forEach(t => {
+      markup += Number(rules.topping[t] || 0)
+    })
+  }
+  return (base + markup).toFixed(2)
 })
 
 const openSpecDialog = product => {
   currentProduct.value = product
+  specs.size = '中杯'
   specs.temp = '常规冰'
   specs.sugar = '全糖'
+  specs.topping = []
   specDialogVisible.value = true
 }
 
@@ -323,15 +386,18 @@ const openSpecDialogFromRanking = item => {
     name: item.productName,
     price: item.price,
     image: item.image,
-    description: item.description
+    description: item.description,
+    specPriceRules: item.specPriceRules
   }
+  specs.size = '中杯'
   specs.temp = '常规冰'
   specs.sugar = '全糖'
+  specs.topping = []
   specDialogVisible.value = true
 }
 
 const handleAddToCart = async () => {
-  await cartStore.add(currentProduct.value, { ...specs })
+  await cartStore.add(currentProduct.value, { ...specs }, Number(calculatedPrice.value))
   ElMessage.success('已加入购物车')
   specDialogVisible.value = false
 }

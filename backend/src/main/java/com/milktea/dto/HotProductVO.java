@@ -13,4 +13,5 @@ public class HotProductVO {
     private Long categoryId;
     private String categoryName;
     private Integer totalSales;
+    private String specPriceRules;
 }

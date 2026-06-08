@@ -98,12 +98,8 @@ public class OrderController {
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (CartItem item : cartItems) {
-            Product product = productMapper.selectById(item.getProductId());
-            if (product == null) {
-                logger.error("创建订单时商品不存在: productId={}", item.getProductId());
-                throw new IllegalArgumentException("商品不存在: " + item.getProductId());
-            }
-            totalAmount = totalAmount.add(product.getPrice().multiply(new BigDecimal(item.getQuantity())));
+            BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            totalAmount = totalAmount.add(itemPrice.multiply(new BigDecimal(item.getQuantity())));
         }
 
         for (CartItem item : cartItems) {
@@ -172,11 +168,12 @@ public class OrderController {
                 logger.error("创建订单项时商品不存在: productId={}", item.getProductId());
                 throw new IllegalArgumentException("商品不存在: " + item.getProductId());
             }
+            BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : product.getPrice();
             OrderItem detail = new OrderItem();
             detail.setOrderId(order.getId());
             detail.setProductId(item.getProductId());
             detail.setProductName(product.getName());
-            detail.setProductPrice(product.getPrice());
+            detail.setProductPrice(itemPrice);
             detail.setQuantity(item.getQuantity());
             detail.setSpecs(item.getSpecs());
             orderItemMapper.insert(detail);

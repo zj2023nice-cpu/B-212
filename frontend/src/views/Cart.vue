@@ -8,12 +8,15 @@
           <img :src="group.image" class="w-20 h-20 rounded-xl object-cover" />
           <div class="flex-grow">
             <h3 class="font-bold text-gray-800">{{ group.productName }}</h3>
-            <div class="mt-1 text-primary font-bold">¥{{ group.price }}</div>
+            <div class="mt-1 text-primary font-bold">¥{{ group.price }}<span class="text-xs text-gray-400 font-normal ml-1">起</span></div>
           </div>
         </div>
         <div class="mt-3 space-y-2">
           <div v-for="spec in group.specs" :key="spec.id" class="flex items-center gap-3 pl-2 py-2 border-t border-gray-100">
-            <span class="text-gray-500 text-sm flex-grow">{{ formatSpecs(spec.specs) }}</span>
+            <div class="flex-grow">
+              <span class="text-gray-500 text-sm">{{ formatSpecs(spec.specs) }}</span>
+              <span class="text-primary font-bold text-sm ml-2">¥{{ spec.unitPrice }}</span>
+            </div>
             <el-input-number v-model="spec.quantity" :min="1" size="small" @change="(val) => handleUpdateQuantity(spec.id, val)" />
             <el-button type="danger" link @click="handleRemove(spec.id)">
               <el-icon><Delete /></el-icon>
@@ -126,7 +129,7 @@ const addressDialogVisible = ref(false)
 const selectedAddress = ref(null)
 
 const totalPrice = computed(() => {
-  return cartStore.groups.reduce((sum, g) => sum + (g.price || 0) * (g.specs || []).reduce((s, item) => s + item.quantity, 0), 0).toFixed(2)
+  return cartStore.groups.reduce((sum, g) => sum + (g.specs || []).reduce((s, item) => s + (Number(item.unitPrice) || 0) * item.quantity, 0), 0).toFixed(2)
 })
 
 const finalPrice = computed(() => {
@@ -137,7 +140,12 @@ const finalPrice = computed(() => {
 const formatSpecs = (specsStr) => {
   try {
     const s = JSON.parse(specsStr)
-    return `${s.temp} / ${s.sugar}`
+    const parts = []
+    if (s.size) parts.push(s.size)
+    parts.push(s.temp)
+    parts.push(s.sugar)
+    if (s.topping && s.topping.length > 0) parts.push(s.topping.join('/'))
+    return parts.join(' / ')
   } catch (e) { return specsStr }
 }
 

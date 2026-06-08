@@ -16,6 +16,7 @@ public class ProductAdminVO {
     private Integer status;
     private Integer stock;
     private Integer lowStockThreshold;
+    private String specPriceRules;
     private Boolean lowStock;
     private Integer version;
     private LocalDateTime createTime;

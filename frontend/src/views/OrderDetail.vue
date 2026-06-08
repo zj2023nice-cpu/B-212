@@ -221,7 +221,12 @@ const isInProgress = status => {
 const formatSpecs = specsStr => {
   try {
     const s = JSON.parse(specsStr)
-    return `${s.temp} / ${s.sugar}`
+    const parts = []
+    if (s.size) parts.push(s.size)
+    parts.push(s.temp)
+    parts.push(s.sugar)
+    if (s.topping && s.topping.length > 0) parts.push(s.topping.join('/'))
+    return parts.join(' / ')
   } catch (e) {
     return specsStr
   }

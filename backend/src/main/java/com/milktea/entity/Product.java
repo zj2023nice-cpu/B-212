@@ -21,6 +21,7 @@ public class Product {
     private Integer status;
     private Integer stock;
     private Integer lowStockThreshold;
+    private String specPriceRules;
     @Version
     private Integer version;
     private LocalDateTime createTime;

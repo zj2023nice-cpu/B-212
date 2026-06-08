@@ -65,6 +65,7 @@ public class ProductAdminController {
             vo.setStatus(p.getStatus());
             vo.setStock(p.getStock());
             vo.setLowStockThreshold(p.getLowStockThreshold());
+            vo.setSpecPriceRules(p.getSpecPriceRules());
             int threshold = p.getLowStockThreshold() != null ? p.getLowStockThreshold() : 10;
             vo.setLowStock(p.getStock() != null && p.getStock() < threshold);
             vo.setVersion(p.getVersion());

@@ -1,6 +1,8 @@
 package com.milktea.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.milktea.common.Result;
 import com.milktea.dto.CartGroupVO;
 import com.milktea.entity.CartItem;
@@ -11,6 +13,7 @@ import com.milktea.mapper.ProductMapper;
 import com.milktea.service.ProductService;
 import com.milktea.service.UserService;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private static final Logger logger = LoggerFactory.getLogger(CartController.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private CartItemMapper cartItemMapper;
@@ -47,6 +51,51 @@ public class CartController {
         }
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userService.getByUsername(username).getId();
+    }
+
+    private BigDecimal calculateUnitPrice(Product product, String specsJson) {
+        BigDecimal basePrice = product.getPrice();
+        if (product.getSpecPriceRules() == null || product.getSpecPriceRules().isBlank()) {
+            return basePrice;
+        }
+        try {
+            Map<String, Object> rules = objectMapper.readValue(product.getSpecPriceRules(),
+                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> specs = objectMapper.readValue(specsJson,
+                    new TypeReference<Map<String, Object>>() {});
+
+            BigDecimal markup = BigDecimal.ZERO;
+
+            Object sizeVal = specs.get("size");
+            if (sizeVal != null && rules.containsKey("size")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sizeRules = (Map<String, Object>) rules.get("size");
+                Object sizeMarkup = sizeRules.get(String.valueOf(sizeVal));
+                if (sizeMarkup != null) {
+                    markup = markup.add(new BigDecimal(String.valueOf(sizeMarkup)));
+                }
+            }
+
+            Object toppingVal = specs.get("topping");
+            if (toppingVal != null && rules.containsKey("topping")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> toppingRules = (Map<String, Object>) rules.get("topping");
+                @SuppressWarnings("unchecked")
+                List<String> toppings = (List<String>) toppingVal;
+                for (String t : toppings) {
+                    Object tMarkup = toppingRules.get(t);
+                    if (tMarkup != null) {
+                        markup = markup.add(new BigDecimal(String.valueOf(tMarkup)));
+                    }
+                }
+            }
+
+            return basePrice.add(markup);
+        } catch (Exception e) {
+            logger.warn("解析规格加价规则失败: productId={}, rules={}, specs={}, error={}",
+                    product.getId(), product.getSpecPriceRules(), specsJson, e.getMessage());
+            return basePrice;
+        }
     }
 
     @GetMapping
@@ -83,6 +132,14 @@ public class CartController {
             return Result.error("Product not found");
         }
 
+        BigDecimal calculatedPrice = calculateUnitPrice(product, cartItem.getSpecs());
+        if (cartItem.getUnitPrice() != null && cartItem.getUnitPrice().compareTo(calculatedPrice) != 0) {
+            logger.warn("购物车加价校验失败: 前端价格={}, 后端计算价格={}, productId={}, specs={}",
+                    cartItem.getUnitPrice(), calculatedPrice, cartItem.getProductId(), cartItem.getSpecs());
+            return Result.error("价格校验失败，请刷新后重试");
+        }
+        cartItem.setUnitPrice(calculatedPrice);
+
         LambdaQueryWrapper<CartItem> query = new LambdaQueryWrapper<CartItem>()
                 .eq(CartItem::getUserId, cartItem.getUserId())
                 .eq(CartItem::getProductId, cartItem.getProductId())
@@ -104,6 +161,7 @@ public class CartController {
 
         if (existing != null) {
             existing.setQuantity(totalQuantity);
+            existing.setUnitPrice(calculatedPrice);
             cartItemMapper.updateById(existing);
         } else {
             cartItemMapper.insert(cartItem);
